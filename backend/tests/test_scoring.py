@@ -1,18 +1,10 @@
 import unittest
 
-from app.main import (
-    Evidence,
-    assert_job_url_accessible,
-    build_recommendation,
-    build_usage_snapshot,
-    build_search_query,
-    evidence_score,
-    evidence_to_payload,
-    pattern_check,
-    rdap_lookup,
-    search_result_severity,
-    score_to_tier,
-)
+from app.analysis import assert_job_url_accessible, build_recommendation, evidence_to_payload
+from app.metrics import build_usage_snapshot
+from app.models import Evidence
+from app.scoring import evidence_score, pattern_check, score_to_tier
+from app.verification import build_search_query, rdap_lookup, search_result_severity
 
 
 ALMUMTAJ_MESSAGE = """Hello Gobika Sekar,
@@ -189,11 +181,11 @@ class TrustRadarScoringTests(unittest.TestCase):
         self.assertEqual(payload["links"][1]["url"], "https://example.com/review")
 
     def test_usage_snapshot_reports_request_deltas(self):
-        from app import main
+        from app import metrics
 
-        before = main.METRICS.copy()
-        main.METRICS["url_fetches"] += 2
-        main.METRICS["dns_lookups"] += 1
+        before = metrics.METRICS.copy()
+        metrics.METRICS["url_fetches"] += 2
+        metrics.METRICS["dns_lookups"] += 1
         usage = build_usage_snapshot(before)
 
         self.assertEqual(usage["url_fetches"], 2)
