@@ -15,6 +15,16 @@ from app.models import Evidence
 from app.text_utils import domain_from_url, extract_emails, extract_urls, is_known_ats_domain, registered_domain
 
 
+BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+
 async def resolve_dns(domain: str) -> Evidence:
     METRICS["dns_lookups"] += 1
     try:
@@ -29,25 +39,31 @@ async def fetch_url(client: httpx.AsyncClient, url: str) -> Evidence:
     METRICS["url_fetches"] += 1
     try:
         response = await client.get(url, follow_redirects=True)
-        title = ""
-        if "text/html" in response.headers.get("content-type", ""):
-            soup = BeautifulSoup(response.text[:100_000], "html.parser")
-            title = soup.title.string.strip() if soup.title and soup.title.string else ""
-        final_domain = domain_from_url(str(response.url)) or "unknown domain"
-        detail = f"HTTP {response.status_code} from {final_domain}"
-        if title:
-            detail += f"; title: {title[:120]}"
-        severity = "info" if response.status_code < 400 else "medium"
-        title_lower = title.lower()
-        if any(term in title_lower for term in ["access denied", "just a moment", "captcha", "verify you are human", "blocked"]):
-            severity = "medium"
-            return Evidence("URL reachability", "blocked", f"{detail}; page appears blocked or requires browser verification", url, severity)
-        if any(term in title_lower for term in ["gulf jobs", "salary", "visa guide", "jobs 2026"]):
-            severity = "medium"
-            detail += "; page title looks like a generic jobs/visa-content site, not an interview page"
-        return Evidence("URL reachability", "checked", detail, url, severity)
+        if response.status_code in {403, 406, 429}:
+            response = await client.get(url, follow_redirects=True, headers=BROWSER_HEADERS)
+        return response_to_evidence(response, url)
     except httpx.HTTPError as exc:
         return Evidence("URL reachability", "failed", f"Could not fetch URL: {exc.__class__.__name__}", url, "medium")
+
+
+def response_to_evidence(response: httpx.Response, original_url: str) -> Evidence:
+    title = ""
+    if "text/html" in response.headers.get("content-type", ""):
+        soup = BeautifulSoup(response.text[:100_000], "html.parser")
+        title = soup.title.string.strip() if soup.title and soup.title.string else ""
+    final_domain = domain_from_url(str(response.url)) or "unknown domain"
+    detail = f"HTTP {response.status_code} from {final_domain}"
+    if title:
+        detail += f"; title: {title[:120]}"
+    severity = "info" if response.status_code < 400 else "medium"
+    title_lower = title.lower()
+    if any(term in title_lower for term in ["access denied", "just a moment", "captcha", "verify you are human", "blocked"]):
+        severity = "medium"
+        return Evidence("URL reachability", "blocked", f"{detail}; page appears blocked or requires browser verification", original_url, severity)
+    if any(term in title_lower for term in ["gulf jobs", "salary", "visa guide", "jobs 2026"]):
+        severity = "medium"
+        detail += "; page title looks like a generic jobs/visa-content site, not an interview page"
+    return Evidence("URL reachability", "checked", detail, original_url, severity)
 
 
 async def rdap_lookup(client: httpx.AsyncClient, domain: str) -> Evidence:
@@ -228,8 +244,7 @@ async def verify_live(text: str, submitted_urls: list[str]) -> list[Evidence]:
     domains = sorted({registered_domain(domain) for domain in domains})
 
     timeout = httpx.Timeout(8.0, connect=4.0)
-    headers = {"User-Agent": "TrustRadar/0.1 (+https://local)"}
-    async with httpx.AsyncClient(timeout=timeout, headers=headers) as client:
+    async with httpx.AsyncClient(timeout=timeout, headers=BROWSER_HEADERS) as client:
         tasks = []
         for url in urls[:4]:
             tasks.append(fetch_url(client, url))

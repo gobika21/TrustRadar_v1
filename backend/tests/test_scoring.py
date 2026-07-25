@@ -161,6 +161,20 @@ class TrustRadarScoringTests(unittest.TestCase):
                 ],
             )
 
+    def test_accessible_submitted_job_url_does_not_raise_access_error(self):
+        assert_job_url_accessible(
+            "https://www.d4insight.com/jobopening/full-stack-developer-awa-platform/",
+            [
+                Evidence(
+                    "URL reachability",
+                    "checked",
+                    "HTTP 200 from d4insight.com",
+                    "https://www.d4insight.com/jobopening/full-stack-developer-awa-platform/",
+                    "info",
+                )
+            ],
+        )
+
     def test_recommendation_labels_are_action_oriented(self):
         self.assertEqual(build_recommendation("low")["label"], "Likely safe to apply")
         self.assertEqual(build_recommendation("medium")["label"], "Apply with caution")
