@@ -14,7 +14,7 @@ KNOWN_ATS_DOMAINS = {
 
 
 def extract_urls(text: str) -> list[str]:
-    urls = re.findall(r"https?://[^\s<>)\"']+", text)
+    urls = re.findall(r"https?://[^\s<>\]\)\"']+", text)
     bare_domains = re.findall(
         r"(?<!@)\b(?:[a-zA-Z0-9-]+\.)+(?:com|net|org|ae|sa|qa|kw|bh|om|co|io|ai|jobs)\b",
         text,
@@ -32,7 +32,10 @@ def extract_emails(text: str) -> list[str]:
 
 
 def domain_from_url(url: str) -> str | None:
-    parsed = urlparse(url if url.startswith(("http://", "https://")) else f"https://{url}")
+    try:
+        parsed = urlparse(url if url.startswith(("http://", "https://")) else f"https://{url}")
+    except ValueError:
+        return None
     host = parsed.netloc.lower().split("@")[-1].split(":")[0]
     if host.startswith("www."):
         host = host[4:]

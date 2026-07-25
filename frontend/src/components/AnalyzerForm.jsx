@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  Info,
   Link2,
   Loader2,
   Radar,
@@ -52,6 +53,11 @@ export function AnalyzerForm({
           />
         </label>
       </div>
+
+      <p className="privacy-note">
+        <Info size={14} />
+        Avoid uploading passports, IDs, bank details, OTPs, or private offer documents.
+      </p>
 
       <button className={`analyze-button${loading ? " is-loading" : ""}`} type="submit" disabled={!hasInput || loading}>
         {loading ? (

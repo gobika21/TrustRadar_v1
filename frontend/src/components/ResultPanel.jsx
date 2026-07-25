@@ -1,13 +1,13 @@
 import React from "react";
-import { Activity, AlertTriangle, CheckCircle2, ExternalLink, Globe, Loader2, Radar, ShieldCheck, Sparkles } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, ExternalLink, Globe, Loader2, Radar, ShieldCheck, Sparkles, Terminal } from "lucide-react";
 import { severityLabel, tierClass } from "../utils/risk";
 
-const loadingSteps = [
-  "Reading the job details",
-  "Checking scam patterns",
-  "Verifying links and domains",
-  "Reviewing web signals",
-  "Preparing the recommendation",
+const terminalSteps = [
+  { at: 8, command: "intake.read()", detail: "Reading submitted job evidence" },
+  { at: 24, command: "patterns.scan()", detail: "Checking scam language and recruiter signals" },
+  { at: 44, command: "links.verify()", detail: "Resolving URLs, DNS, and domain records" },
+  { at: 66, command: "web.review()", detail: "Searching public complaint and fake-job signals" },
+  { at: 84, command: "report.compose()", detail: "Preparing recommendation and evidence summary" },
 ];
 
 export function ResultPanel({ result, loading, progress = 0 }) {
@@ -70,32 +70,50 @@ function EmptyPanel() {
 }
 
 function LoadingPanel({ progress }) {
+  const activeIndex = terminalSteps.reduce((latestIndex, step, index) => (progress >= step.at ? index : latestIndex), -1);
+  const visibleSteps = terminalSteps.slice(0, Math.max(2, activeIndex + 2));
+
   return (
     <aside className="result-panel loading-panel">
-      <div className="loading-core">
-        <Loader2 className="spin" size={28} />
-        <div>
+      <section className="terminal-card">
+        <div className="terminal-topbar">
+          <span />
+          <span />
+          <span />
+          <strong><Terminal size={15} /> TrustRadar agent</strong>
+        </div>
+
+        <div className="terminal-body">
           <p className="eyebrow">Review in progress</p>
           <h2>Checking the posting</h2>
-          <p>Scanning the text, links, domains, and public signals. Results usually appear in a few seconds.</p>
-        </div>
-      </div>
-      <div className="progress-track" aria-label={`Analysis ${progress}% complete`}>
-        <span style={{ width: `${progress}%` }} />
-        <strong>{progress}%</strong>
-      </div>
+          <p className="terminal-copy">The agent is reading the evidence, validating live signals, and building a recommendation.</p>
 
-      <div className="step-list">
-        {loadingSteps.map((step, index) => (
-          <div className="step-item" key={step}>
-            <span className={index < 2 ? "complete" : index === 2 ? "active" : "pending"}>
-              {index < 2 ? <CheckCircle2 size={14} /> : index === 2 ? <Loader2 className="spin" size={14} /> : index + 1}
-            </span>
-            <strong>{step}</strong>
-            <small>{index < 2 ? "Complete" : index === 2 ? "In progress" : "Queued"}</small>
+          <div className="terminal-progress" aria-label={`Analysis ${progress}% complete`}>
+            <span style={{ width: `${progress}%` }} />
+            <strong>{progress}%</strong>
           </div>
-        ))}
-      </div>
+
+          <div className="terminal-lines">
+            {visibleSteps.map((step, index) => {
+              const isDone = progress >= terminalSteps[index + 1]?.at;
+              const isActive = index === activeIndex || (!isDone && index === visibleSteps.length - 1);
+              return (
+                <div className={isActive ? "terminal-line active" : "terminal-line"} key={step.command}>
+                  <span className="terminal-prompt">$</span>
+                  <code>{step.command}</code>
+                  <small>{isDone ? "done" : isActive ? "running" : "queued"}</small>
+                  <p>{step.detail}</p>
+                </div>
+              );
+            })}
+            <div className="terminal-line cursor-line">
+              <span className="terminal-prompt">$</span>
+              <code>await result</code>
+              <Loader2 className="spin" size={13} />
+            </div>
+          </div>
+        </div>
+      </section>
     </aside>
   );
 }
@@ -149,11 +167,13 @@ function AgentWorkflow({ steps, usage }) {
 }
 
 function LiveVerification({ evidence }) {
+  const reviewedEvidence = evidence || [];
+
   return (
     <section className="report-section compact-live">
       <h3>Evidence reviewed</h3>
       <div className="evidence-list">
-        {evidence.slice(0, 4).map((item, index) => (
+        {reviewedEvidence.length ? reviewedEvidence.map((item, index) => (
           <article className="evidence" key={`${item.label}-${index}`}>
             <Globe size={16} />
             <div>
@@ -173,7 +193,18 @@ function LiveVerification({ evidence }) {
               ) : null}
             </div>
           </article>
-        ))}
+        )) : (
+          <article className="evidence">
+            <Globe size={16} />
+            <div>
+              <div className="evidence-title">
+                <strong>No live evidence found</strong>
+                <span className="medium">Review</span>
+              </div>
+              <p>Paste a public job link or company site if you want TrustRadar to verify domains and web signals.</p>
+            </div>
+          </article>
+        )}
       </div>
     </section>
   );
@@ -199,20 +230,20 @@ function fallbackRecommendation(result) {
 }
 
 function getRedFlags(result) {
-  const patternFlags = result.pattern_findings
+  const patternFlags = (result.pattern_findings || [])
     .filter((item) => ["critical", "high", "medium"].includes(item.severity))
     .map((item) => item.label);
-  const evidenceFlags = result.live_evidence
+  const evidenceFlags = (result.live_evidence || [])
     .filter((item) => ["critical", "high", "medium"].includes(item.severity))
     .map((item) => `${item.label}: ${summarizeEvidence(item.detail)}`);
   return [...patternFlags, ...evidenceFlags].slice(0, 4);
 }
 
 function getTrustReasons(result) {
-  const reasons = result.live_evidence
+  const reasons = (result.live_evidence || [])
     .filter((item) => item.severity === "info")
     .map((item) => `${item.label}: ${summarizeEvidence(item.detail)}`);
-  if (!result.pattern_findings.length) reasons.unshift("The message does not match common scam-language patterns.");
+  if (!(result.pattern_findings || []).length) reasons.unshift("The message does not match common scam-language patterns.");
   return reasons.length ? reasons.slice(0, 4) : ["The evidence was reviewed, but it does not provide enough positive signals to classify the posting as low risk."];
 }
 

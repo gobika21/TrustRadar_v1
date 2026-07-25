@@ -1,8 +1,9 @@
 import React from "react";
 import { AlertTriangle, X } from "lucide-react";
 
-export function Toast({ message, onDismiss }) {
-  if (!message) return null;
+export function Toast({ error, message, onDismiss }) {
+  const normalizedError = normalizeError(error || message);
+  if (!normalizedError.message) return null;
 
   return (
     <div className="error-modal-backdrop" role="presentation">
@@ -14,13 +15,29 @@ export function Toast({ message, onDismiss }) {
           <AlertTriangle size={22} />
         </div>
         <div>
-          <h2 id="error-modal-title">Unable to review this link</h2>
-          <p>{message}</p>
+          <h2 id="error-modal-title">{normalizedError.title}</h2>
+          <p>{normalizedError.message}</p>
         </div>
         <button className="error-modal-action" type="button" onClick={onDismiss}>
-          Try another input
+          {normalizedError.action}
         </button>
       </section>
     </div>
   );
+}
+
+function normalizeError(error) {
+  if (!error) return { title: "", message: "", action: "Close" };
+  if (typeof error === "string") {
+    return {
+      title: "Unable to review this input",
+      message: error,
+      action: "Try again",
+    };
+  }
+  return {
+    title: error.title || "Unable to review this input",
+    message: error.message || "",
+    action: error.action || "Try again",
+  };
 }

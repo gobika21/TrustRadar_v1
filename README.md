@@ -9,6 +9,7 @@ The app does not return a flat "scam/not scam" answer. It runs a small verificat
 - Reviews pasted job descriptions, recruiter emails, DMs, or screenshot text.
 - Accepts one related link, such as a job posting URL, recruiter profile, or company website.
 - Accepts screenshots or supporting files as evidence.
+- Shows a privacy reminder before upload so users avoid sharing IDs, bank details, OTPs, or private documents.
 - Detects scam-language patterns such as upfront fees, urgency, generic recruiter signatures, and early requests for sensitive information.
 - Performs live checks for URL reachability, DNS resolution, domain registration/RDAP data, and public web-search signals.
 - Separates inaccessible/private job links from actual risk scoring.

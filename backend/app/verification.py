@@ -130,6 +130,12 @@ def domain_tokens(query: str) -> set[str]:
     lowered = query.lower()
     company_match = re.search(r"\b([a-z0-9][a-z0-9-]{2,})\s+company\s+recruitment\s+scam\b", lowered)
     query_tokens = {company_match.group(1).replace("-", "")} if company_match else set()
+    plain_company_match = re.search(r"\b([a-z0-9][a-z0-9 .&-]{2,60}?)\s+recruitment\s+scam\b", lowered)
+    if plain_company_match:
+        query_tokens.update(
+            token.replace("-", "")
+            for token in re.findall(r"[a-z0-9-]{4,}", plain_company_match.group(1))
+        )
     host_match = re.search(r"\b([a-z0-9-]+\.[a-z]{2,})\b", lowered)
     if not host_match:
         return {token for token in query_tokens if len(token) >= 4}
@@ -166,14 +172,25 @@ def search_result_severity(query: str, result_text: str) -> str:
         "are a scam",
     ]
     reputation_page_terms = ["scam or legit", "trustpilot", "scam-detector"]
-    has_negative_signal = any(term in lowered for term in negative_terms)
-    has_reputation_page = any(term in lowered for term in reputation_page_terms)
-    has_target_signal = any(token in lowered for token in domain_tokens(query))
-    if has_negative_signal and has_target_signal:
+    target_tokens = domain_tokens(query)
+    result_entries = [entry.strip().lower() for entry in re.split(r"\s+\|\s+", result_text) if entry.strip()]
+    target_negative_entries = [
+        entry
+        for entry in result_entries
+        if any(term in entry for term in negative_terms) and any(token in entry for token in target_tokens)
+    ]
+    target_reputation_entries = [
+        entry
+        for entry in result_entries
+        if any(term in entry for term in reputation_page_terms) and any(token in entry for token in target_tokens)
+    ]
+    if target_negative_entries:
         return "high"
-    if any(term in lowered for term in ["job scam alert", "job scam", "fake recruiting", "fake job offers", "personal data theft"]):
+    if any(term in lowered for term in ["job scam alert", "job scam", "fake recruiting", "fake job offers", "personal data theft"]) and any(
+        token in lowered for token in target_tokens
+    ):
         return "medium"
-    if has_reputation_page and has_target_signal:
+    if target_reputation_entries:
         return "medium"
     return "info"
 
@@ -214,8 +231,23 @@ def build_search_query(text: str, urls: list[str], emails: list[str]) -> str:
     company_match = re.search(r"(?:company|employer|client|organization|organisation)[:\s-]+([A-Z][A-Za-z0-9 &.,-]{2,60})", text)
     if company_match:
         return f"{company_match.group(1).strip()} recruitment scam"
+    about_match = re.search(
+        r"(?:^|\n)\s*About\s+([A-Z][A-Za-z0-9 &.,'-]{2,70}?)(?:\n|$)",
+        text,
+    )
+    if about_match:
+        company_name = normalize_company_name(about_match.group(1))
+        if company_name:
+            return f"{company_name} recruitment scam"
     words = re.findall(r"\b[A-Z][A-Za-z0-9&.-]{2,}\b", text)
     return " ".join(words[:4] + ["recruitment", "scam"]) if words else ""
+
+
+def normalize_company_name(value: str) -> str:
+    value = re.sub(r"\s+", " ", value).strip(" .,-")
+    value = re.sub(r"\b(Inc|LLC|Ltd|Limited|Corporation|Corp|Company|Co)\.?\b", "", value, flags=re.IGNORECASE)
+    value = re.sub(r"\s+", " ", value).strip(" .,-")
+    return value
 
 
 def employer_slug_from_ats_url(urls: list[str]) -> str | None:
@@ -233,7 +265,19 @@ def employer_slug_from_ats_url(urls: list[str]) -> str | None:
                 return path_parts[0].replace("-", " ")
         if host.endswith("jobs.ashbyhq.com") and path_parts:
             return path_parts[0].replace("-", " ")
+        if host.endswith("myworkdayjobs.com"):
+            tenant = host.split(".", 1)[0]
+            if tenant and tenant not in {"www", "wd1", "wd2", "wd3", "wd5"}:
+                return humanize_company_slug(tenant)
+            if path_parts:
+                return humanize_company_slug(path_parts[0])
     return None
+
+
+def humanize_company_slug(value: str) -> str:
+    spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", value)
+    spaced = re.sub(r"[-_]+", " ", spaced)
+    return re.sub(r"\s+", " ", spaced).strip()
 
 
 async def verify_live(text: str, submitted_urls: list[str]) -> list[Evidence]:

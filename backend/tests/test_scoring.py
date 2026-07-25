@@ -6,6 +6,8 @@ from app.analysis import assert_job_url_accessible, build_recommendation, eviden
 from app.metrics import build_usage_snapshot
 from app.models import Evidence
 from app.scoring import evidence_score, pattern_check, score_to_tier
+from app.text_utils import domain_from_url, extract_urls
+from app.uploads import decode_text_upload
 from app.verification import build_search_query, rdap_lookup, search_result_severity
 
 
@@ -108,6 +110,17 @@ class TrustRadarScoringTests(unittest.TestCase):
 
         self.assertEqual(query, "decilegroup company recruitment scam")
 
+    def test_workday_jobs_search_by_tenant_employer(self):
+        query = build_search_query(
+            "",
+            [
+                "https://riministreet.wd1.myworkdayjobs.com/RiminiStreet/job/Dubai-UAE/Forward-Deployed-Engineer--Agentic-AI-_R-102256"
+            ],
+            [],
+        )
+
+        self.assertEqual(query, "riministreet company recruitment scam")
+
     def test_generic_reputation_pages_are_not_high_without_scam_claims(self):
         detail = (
             "Top results: lever.co Reviews: Is this site a scam or legit? - Scam Detector "
@@ -121,6 +134,22 @@ class TrustRadarScoringTests(unittest.TestCase):
 
         self.assertEqual(search_result_severity("avetta company recruitment scam", detail), "high")
 
+    def test_about_company_heading_builds_clean_search_query(self):
+        query = build_search_query("About Rimini Street, Inc.\n\nWe are actively seeking an engineer.", [], [])
+
+        self.assertEqual(query, "Rimini Street recruitment scam")
+
+    def test_text_uploads_can_be_decoded_for_analysis(self):
+        self.assertIn("Rimini Street", decode_text_upload("About Rimini Street, Inc.".encode("utf-8")))
+
+    def test_markdown_link_text_does_not_create_invalid_url(self):
+        urls = extract_urls("[http://www.riministreet.com](http://www.riministreet.com/)")
+
+        self.assertIn("http://www.riministreet.com", urls)
+        self.assertIn("http://www.riministreet.com/", urls)
+        self.assertNotIn("http://www.riministreet.com](http://www.riministreet.com/", urls)
+        self.assertIsNone(domain_from_url("http://www.riministreet.com](http://www.riministreet.com/"))
+
     def test_dead_posting_link_needs_verification(self):
         tier, tier_level = score_to_tier(
             evidence_score(
@@ -130,8 +159,32 @@ class TrustRadarScoringTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(tier_level, "medium")
-        self.assertEqual(tier, "Needs verification")
+        self.assertEqual(tier_level, "low")
+        self.assertEqual(tier, "Lower risk")
+
+    def test_generic_search_warning_does_not_attach_to_company(self):
+        detail = (
+            "Top results: info.riministreet.com Reviews | scam, legit or safe check | Scamadviser "
+            "(https://www.scamadviser.com/check-website/info.riministreet.com) | "
+            "Scammers impersonate well-known companies, recruit for fake jobs on LinkedIn "
+            "(https://consumer.ftc.gov/example)"
+        )
+
+        self.assertEqual(search_result_severity("riministreet.com company recruitment scam", detail), "info")
+
+    def test_failed_live_checks_do_not_create_scam_score(self):
+        tier, tier_level = score_to_tier(
+            evidence_score(
+                [
+                    Evidence("URL reachability", "failed", "Could not fetch URL: ConnectTimeout", "https://example.com", "medium"),
+                    Evidence("Domain registration", "failed", "RDAP lookup failed: ConnectTimeout", "example.com", "medium"),
+                    Evidence("Web search", "failed", "Search failed: ConnectTimeout", "example company recruitment scam", "medium"),
+                ]
+            )
+        )
+
+        self.assertEqual(tier_level, "low")
+        self.assertEqual(tier, "Lower risk")
 
     def test_inaccessible_submitted_job_url_raises_access_error(self):
         with self.assertRaisesRegex(Exception, "could not access the job posting URL"):

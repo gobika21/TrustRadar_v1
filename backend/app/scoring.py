@@ -187,5 +187,12 @@ def evidence_score(evidence: list[Evidence]) -> int:
         elif item.severity == "high":
             score += 30 if item.label == "Web search" else 16
         elif item.severity == "medium":
-            score += 24 if item.label == "URL reachability" else 8
+            if item.status in {"failed", "skipped", "not_found"}:
+                continue
+            if item.label == "URL reachability":
+                score += 8
+            elif item.label == "Domain registration":
+                score += 16
+            else:
+                score += 8
     return score

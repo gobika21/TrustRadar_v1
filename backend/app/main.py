@@ -19,6 +19,7 @@ from app.models import Evidence
 from app.scoring import evidence_score, pattern_check, score_to_tier
 from app.storage import clear_analyses, get_analysis, initialize_database, list_analyses, save_analysis
 from app.text_utils import domain_from_url, extract_emails, extract_urls
+from app.uploads import read_uploads
 from app.verification import build_search_query, rdap_lookup, search_result_severity, verify_live
 
 
@@ -79,20 +80,13 @@ async def analyze(
     METRICS["analyze_requests"] += 1
     usage_before = METRICS.copy()
     submitted_urls = [url.strip() for url in [job_url, recruiter_url, company_url] if url.strip()]
-    uploaded_files = [
-        {
-            "name": file.filename,
-            "content_type": file.content_type,
-            "note": "Upload accepted. OCR is not enabled in this local v1, so include screenshot text when possible.",
-        }
-        for file in files
-        if file.filename
-    ]
+    uploaded_text, uploaded_files = await read_uploads(files)
+    analysis_text = "\n\n".join(part for part in [text.strip(), uploaded_text] if part)
     METRICS["uploaded_files"] += len(uploaded_files)
 
     try:
-        pattern_score, findings = pattern_check(text)
-        live_evidence = await verify_live(text, submitted_urls)
+        pattern_score, findings = pattern_check(analysis_text)
+        live_evidence = await verify_live(analysis_text, submitted_urls)
         assert_job_url_accessible(job_url, live_evidence)
         total_score = min(100, pattern_score + evidence_score(live_evidence))
         tier, tier_level = score_to_tier(total_score)
@@ -114,14 +108,14 @@ async def analyze(
         "score": total_score,
         "summary": summary,
         "recommendation": build_recommendation(tier_level),
-        "agent_workflow": build_agent_workflow(text, submitted_urls, findings, live_evidence),
+        "agent_workflow": build_agent_workflow(analysis_text, submitted_urls, findings, live_evidence),
         "usage": build_usage_snapshot(usage_before),
         "pattern_findings": findings,
         "live_evidence": [evidence_to_payload(item) for item in live_evidence],
         "uploaded_files": uploaded_files,
         "extracted": {
-            "urls": extract_urls(text) + submitted_urls,
-            "emails": extract_emails(text),
+            "urls": extract_urls(analysis_text) + submitted_urls,
+            "emails": extract_emails(analysis_text),
         },
         "recommendations": [
             "Do not pay fees or deposits for interviews, visas, training, or equipment.",
@@ -136,7 +130,7 @@ async def analyze(
             "createdAt": datetime.now(timezone.utc).isoformat(),
             "label": build_history_label(text, job_url, uploaded_files),
             "input": {
-                "text": text,
+                "text": analysis_text,
                 "linkUrl": job_url,
                 "files": uploaded_files,
             },
