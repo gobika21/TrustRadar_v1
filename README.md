@@ -13,7 +13,7 @@ The app does not return a flat "scam/not scam" answer. It runs a small verificat
 - Performs live checks for URL reachability, DNS resolution, domain registration/RDAP data, and public web-search signals.
 - Separates inaccessible/private job links from actual risk scoring.
 - Shows a final recommendation, red flags, trust signals, evidence reviewed, agent workflow, and live-check usage counts.
-- Keeps recent checks in browser state until the page is refreshed.
+- Stores analysis history in a local SQLite database for later review.
 
 ## Agentic Workflow
 
@@ -38,6 +38,7 @@ The result includes:
 
 - Frontend: React + Vite
 - Backend: FastAPI
+- Database: SQLite
 - Live verification: HTTP checks, DNS lookup, RDAP/domain checks, DuckDuckGo HTML search parsing
 - Styling: Custom CSS with light/dark theme support
 
@@ -52,6 +53,7 @@ TrustRadar/
       metrics.py       In-memory metrics and per-analysis usage counts
       models.py        Shared backend models
       scoring.py       Scam-pattern detection and risk scoring
+      storage.py       SQLite persistence for saved analyses
       text_utils.py    URL, email, domain, and ATS helpers
       verification.py  URL fetch, DNS, RDAP, and web search checks
     tests/
@@ -113,6 +115,18 @@ Returns backend status.
 
 Returns in-memory usage counters. These reset when the backend restarts.
 
+### `GET /api/history`
+
+Returns saved analysis history from SQLite.
+
+### `GET /api/history/{entry_id}`
+
+Returns one saved analysis with the original input and full result.
+
+### `DELETE /api/history`
+
+Clears saved analysis history.
+
 ### `POST /api/analyze`
 
 Multipart form fields:
@@ -154,11 +168,12 @@ python -m unittest tests/test_scoring.py
 - RDAP/domain data can be incomplete for some TLDs.
 - Some job boards block automated access. In that case, TrustRadar shows an access error instead of scoring the URL as low or high risk.
 - Metrics are in-memory only and reset when the backend restarts.
+- History is stored locally in `backend/data/trustradar.sqlite3`, which is ignored by Git.
 
 ## Suggested Next Improvements
 
 - Add OCR for screenshots.
-- Add a persistent database for review history.
+- Add filtering and search for saved history.
 - Add structured source cards for each web result.
 - Add sample demo scenarios.
 - Add authentication if deployed publicly.

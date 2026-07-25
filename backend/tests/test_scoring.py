@@ -1,4 +1,6 @@
 import unittest
+import tempfile
+from pathlib import Path
 
 from app.analysis import assert_job_url_accessible, build_recommendation, evidence_to_payload
 from app.metrics import build_usage_snapshot
@@ -204,6 +206,35 @@ class TrustRadarScoringTests(unittest.TestCase):
 
         self.assertEqual(usage["url_fetches"], 2)
         self.assertEqual(usage["dns_lookups"], 1)
+
+    def test_sqlite_history_round_trip(self):
+        from app import storage
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_data_dir = storage.DATA_DIR
+            original_db_path = storage.DB_PATH
+            storage.DATA_DIR = Path(tmpdir)
+            storage.DB_PATH = storage.DATA_DIR / "history.sqlite3"
+            try:
+                storage.save_analysis(
+                    {
+                        "id": "entry-1",
+                        "createdAt": "2026-07-25T08:00:00+00:00",
+                        "label": "example.com",
+                        "input": {"text": "", "linkUrl": "https://example.com", "files": []},
+                        "result": {"score": 0, "tier": "Lower risk", "tier_level": "low"},
+                    }
+                )
+
+                entries = storage.list_analyses()
+                self.assertEqual(entries[0]["id"], "entry-1")
+                self.assertEqual(storage.get_analysis("entry-1")["label"], "example.com")
+
+                storage.clear_analyses()
+                self.assertEqual(storage.list_analyses(), [])
+            finally:
+                storage.DATA_DIR = original_data_dir
+                storage.DB_PATH = original_db_path
 
 
 if __name__ == "__main__":

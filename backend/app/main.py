@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from time import perf_counter
 from typing import Any
+from uuid import uuid4
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.analysis import (
@@ -15,7 +17,8 @@ from app.analysis import (
 from app.metrics import METRICS, build_usage_snapshot, metrics_payload
 from app.models import Evidence
 from app.scoring import evidence_score, pattern_check, score_to_tier
-from app.text_utils import extract_emails, extract_urls
+from app.storage import clear_analyses, get_analysis, initialize_database, list_analyses, save_analysis
+from app.text_utils import domain_from_url, extract_emails, extract_urls
 from app.verification import build_search_query, rdap_lookup, search_result_severity, verify_live
 
 
@@ -30,6 +33,11 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+async def startup() -> None:
+    initialize_database()
+
+
 @app.get("/api/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -38,6 +46,25 @@ async def health() -> dict[str, str]:
 @app.get("/api/metrics")
 async def metrics() -> dict[str, Any]:
     return metrics_payload()
+
+
+@app.get("/api/history")
+async def history(limit: int = 20) -> list[dict[str, Any]]:
+    return list_analyses(max(1, min(limit, 100)))
+
+
+@app.get("/api/history/{entry_id}")
+async def history_entry(entry_id: str) -> dict[str, Any]:
+    entry = get_analysis(entry_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Analysis history entry not found.")
+    return entry
+
+
+@app.delete("/api/history")
+async def delete_history() -> dict[str, str]:
+    clear_analyses()
+    return {"status": "cleared"}
 
 
 @app.post("/api/analyze")
@@ -81,7 +108,7 @@ async def analyze(
     elif tier_level == "medium":
         summary = "Some signals require follow-up before you trust the posting or recruiter."
 
-    return {
+    result = {
         "tier": tier,
         "tier_level": tier_level,
         "score": total_score,
@@ -103,3 +130,32 @@ async def analyze(
             "Do not share passport, Emirates ID, bank details, or OTPs until the employer is verified.",
         ],
     }
+    save_analysis(
+        {
+            "id": str(uuid4()),
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+            "label": build_history_label(text, job_url, uploaded_files),
+            "input": {
+                "text": text,
+                "linkUrl": job_url,
+                "files": uploaded_files,
+            },
+            "result": result,
+        }
+    )
+    return result
+
+
+def build_history_label(text: str, link_url: str, uploaded_files: list[dict[str, str]]) -> str:
+    if link_url.strip():
+        domain = domain_from_url(link_url.strip())
+        return domain or trim_label(link_url.strip())
+    if text.strip():
+        return trim_label(text.strip())
+    if uploaded_files:
+        return f"{len(uploaded_files)} uploaded file{'s' if len(uploaded_files) != 1 else ''}"
+    return "Untitled check"
+
+
+def trim_label(value: str) -> str:
+    return f"{value[:44]}..." if len(value) > 44 else value

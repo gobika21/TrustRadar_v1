@@ -5,7 +5,7 @@ import { AppHeader } from "./components/AppHeader";
 import { HistoryPanel } from "./components/HistoryPanel";
 import { ResultPanel } from "./components/ResultPanel";
 import { Toast } from "./components/Toast";
-import { API_URL } from "./config/api";
+import { API_URL, HISTORY_URL } from "./config/api";
 import { ThemeProvider } from "./context/ThemeProvider";
 import "./styles.css";
 
@@ -41,6 +41,20 @@ function App() {
     return () => window.clearInterval(intervalId);
   }, [loading]);
 
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  async function loadHistory() {
+    try {
+      const response = await fetch(HISTORY_URL);
+      if (!response.ok) throw new Error(`History returned HTTP ${response.status}`);
+      setSearchHistory(await response.json());
+    } catch {
+      // History is helpful but not required for running a new analysis.
+    }
+  }
+
   async function analyze(event) {
     event.preventDefault();
     setLoading(true);
@@ -68,10 +82,7 @@ function App() {
       }
       const analysisResult = await response.json();
       setResult(analysisResult);
-      setSearchHistory((currentHistory) => [
-        buildHistoryEntry({ text, linkUrl, files }, analysisResult),
-        ...currentHistory,
-      ].slice(0, 8));
+      await loadHistory();
       clearInputs();
     } catch (err) {
       setError(err.message || "Analysis failed");
@@ -87,12 +98,27 @@ function App() {
     setFiles([]);
   }
 
-  function selectHistory(entry) {
-    setText(entry.input.text);
-    setLinkUrl(entry.input.linkUrl || entry.input.jobUrl || entry.input.companyUrl || entry.input.recruiterUrl || "");
-    setFiles(entry.input.files);
-    setResult(entry.result);
+  async function selectHistory(entry) {
+    let selectedEntry = entry;
+    try {
+      const response = await fetch(`${HISTORY_URL}/${entry.id}`);
+      if (response.ok) selectedEntry = await response.json();
+    } catch {
+      // Fall back to the list item payload if the detail fetch fails.
+    }
+    setText(selectedEntry.input.text);
+    setLinkUrl(selectedEntry.input.linkUrl || selectedEntry.input.jobUrl || selectedEntry.input.companyUrl || selectedEntry.input.recruiterUrl || "");
+    setFiles([]);
+    setResult(selectedEntry.result);
     setError("");
+  }
+
+  async function clearHistory() {
+    try {
+      await fetch(HISTORY_URL, { method: "DELETE" });
+    } finally {
+      setSearchHistory([]);
+    }
   }
 
   return (
@@ -114,46 +140,13 @@ function App() {
             progress={progress}
             onAnalyze={analyze}
           />
-          <HistoryPanel history={searchHistory} onSelect={selectHistory} onClear={() => setSearchHistory([])} />
+          <HistoryPanel history={searchHistory} onSelect={selectHistory} onClear={clearHistory} />
         </section>
 
         <ResultPanel result={result} loading={loading} progress={progress} />
       </section>
     </main>
   );
-}
-
-function buildHistoryEntry(input, result) {
-  return {
-    id: createHistoryId(),
-    createdAt: new Date().toISOString(),
-    label: getHistoryLabel(input),
-    input,
-    result,
-  };
-}
-
-function createHistoryId() {
-  if (crypto.randomUUID) return crypto.randomUUID();
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function getHistoryLabel({ text, linkUrl, files }) {
-  if (linkUrl) {
-    try {
-      return new URL(linkUrl).hostname.replace(/^www\./, "");
-    } catch {
-      return trimLabel(linkUrl);
-    }
-  }
-
-  if (text.trim()) return trimLabel(text.trim());
-  if (files.length) return `${files.length} uploaded file${files.length > 1 ? "s" : ""}`;
-  return "Untitled check";
-}
-
-function trimLabel(value) {
-  return value.length > 44 ? `${value.slice(0, 44)}...` : value;
 }
 
 createRoot(document.getElementById("root")).render(

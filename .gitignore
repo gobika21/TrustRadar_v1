@@ -1,5 +1,6 @@
 backend/.venv/
 backend/.venv39/
+backend/data/
 backend/app/__pycache__/
 backend/tests/__pycache__/
 frontend/node_modules/
