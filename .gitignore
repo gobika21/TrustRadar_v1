@@ -1,0 +1,7 @@
+backend/.venv/
+backend/.venv39/
+backend/app/__pycache__/
+backend/tests/__pycache__/
+frontend/node_modules/
+frontend/dist/
+.DS_Store

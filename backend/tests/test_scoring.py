@@ -1,0 +1,204 @@
+import unittest
+
+from app.main import (
+    Evidence,
+    assert_job_url_accessible,
+    build_recommendation,
+    build_usage_snapshot,
+    build_search_query,
+    evidence_score,
+    evidence_to_payload,
+    pattern_check,
+    rdap_lookup,
+    search_result_severity,
+    score_to_tier,
+)
+
+
+ALMUMTAJ_MESSAGE = """Hello Gobika Sekar,
+
+Thank you for your message and for sharing your information with us.
+
+We would like to arrange a short online discussion to better understand your background and availability.
+
+Discussion Schedule
+Date: 01 JULY
+Time: Between 10:00 AM and 4:00 PM (UAE Time)
+Mode: Online
+
+Interview information is available at:
+https://www.almumtajllc.com/
+
+Once we receive your availability, we will share the meeting timing with you.
+
+Thank you for your time and cooperation.
+
+Regards,
+Coordination Team
+"""
+
+
+class TrustRadarScoringTests(unittest.TestCase):
+    def test_vague_interview_invite_gets_pattern_score(self):
+        score, findings = pattern_check(ALMUMTAJ_MESSAGE)
+        ids = {finding["id"] for finding in findings}
+
+        self.assertIn("website_instead_of_meeting_link", ids)
+        self.assertIn("date_missing_year", ids)
+        self.assertIn("missing_role", ids)
+        self.assertIn("generic_signature", ids)
+        self.assertGreaterEqual(score, 40)
+
+    def test_targeted_scam_search_result_is_high_severity(self):
+        detail = (
+            "Top results: Mumtaj Co. Job Scam Alert: Be Cautious of Fake Job Offers "
+            "(https://www.linkedin.com/posts/example) | almumtajllc.com Reviews: "
+            "Is this site a scam or legit? (https://www.scam-detector.com/validator/almumtajllc-com-review/)"
+        )
+
+        self.assertEqual(search_result_severity("almumtajllc.com company recruitment scam", detail), "high")
+
+    def test_almumtaj_case_no_longer_scores_lower_risk(self):
+        pattern_score, _ = pattern_check(ALMUMTAJ_MESSAGE)
+        live_score = evidence_score(
+            [
+                Evidence(
+                    "URL reachability",
+                    "checked",
+                    "HTTP 200 from almumtajllc.com; title: Gulf Jobs 2026 - Dubai & Qatar Jobs, Salary, Visa Guide",
+                    "https://www.almumtajllc.com/",
+                    "medium",
+                ),
+                Evidence(
+                    "Web search",
+                    "found",
+                    "Top results: Mumtaj Co. Job Scam Alert: Be Cautious of Fake Job Offers",
+                    "almumtajllc.com company recruitment scam",
+                    "high",
+                ),
+            ]
+        )
+
+        tier, tier_level = score_to_tier(pattern_score + live_score)
+        self.assertIn(tier_level, {"high", "critical"})
+        self.assertIn(tier, {"High risk", "Likely scam"})
+
+    def test_micro1_warning_search_results_raise_risk(self):
+        detail = (
+            "Top results: Beware of micro1: a job scam using AI - LinkedIn "
+            "(https://www.linkedin.com/posts/example) | The Micro1 Deception: "
+            "Inside the AI Recruitment Trap (https://example.com/micro1) | "
+            "Micro1 - Dangerous scam - personal data theft warning "
+            "(https://www.glassdoor.com/Reviews/example)"
+        )
+
+        self.assertEqual(search_result_severity("micro1.ai company recruitment scam", detail), "high")
+
+        tier, tier_level = score_to_tier(
+            evidence_score(
+                [
+                    Evidence("Domain registration", "not_found", "No parseable RDAP record found.", "micro1.ai", "high"),
+                    Evidence("Web search", "found", detail, "micro1.ai company recruitment scam", "high"),
+                ]
+            )
+        )
+        self.assertEqual(tier_level, "high")
+        self.assertEqual(tier, "High risk")
+
+    def test_ats_hosted_jobs_search_by_employer_not_platform(self):
+        query = build_search_query(
+            "",
+            ["https://jobs.lever.co/decilegroup/7d7b7ea2-765a-4604-85f0-8d7df7da1b74"],
+            [],
+        )
+
+        self.assertEqual(query, "decilegroup company recruitment scam")
+
+    def test_generic_reputation_pages_are_not_high_without_scam_claims(self):
+        detail = (
+            "Top results: lever.co Reviews: Is this site a scam or legit? - Scam Detector "
+            "| Lever Reviews | Read Customer Service Reviews of lever.co"
+        )
+
+        self.assertEqual(search_result_severity("lever.co company recruitment scam", detail), "medium")
+
+    def test_company_name_query_can_match_warning_results(self):
+        detail = "Top results: Avetta - Warning! Avoid this company at all cost they are a scam!"
+
+        self.assertEqual(search_result_severity("avetta company recruitment scam", detail), "high")
+
+    def test_dead_posting_link_needs_verification(self):
+        tier, tier_level = score_to_tier(
+            evidence_score(
+                [
+                    Evidence("URL reachability", "checked", "HTTP 404 from jobs.lever.co", "https://jobs.lever.co/example", "medium"),
+                ]
+            )
+        )
+
+        self.assertEqual(tier_level, "medium")
+        self.assertEqual(tier, "Needs verification")
+
+    def test_inaccessible_submitted_job_url_raises_access_error(self):
+        with self.assertRaisesRegex(Exception, "could not access the job posting URL"):
+            assert_job_url_accessible(
+                "https://example.com/private-job",
+                [
+                    Evidence(
+                        "URL reachability",
+                        "failed",
+                        "Could not fetch URL: ReadTimeout",
+                        "https://example.com/private-job",
+                        "medium",
+                    )
+                ],
+            )
+
+    def test_blocked_submitted_job_url_raises_access_error(self):
+        with self.assertRaisesRegex(Exception, "could not access the job posting URL"):
+            assert_job_url_accessible(
+                "https://example.com/private-job",
+                [
+                    Evidence(
+                        "URL reachability",
+                        "blocked",
+                        "HTTP 403 from example.com; page appears blocked or requires browser verification",
+                        "https://example.com/private-job",
+                        "medium",
+                    )
+                ],
+            )
+
+    def test_recommendation_labels_are_action_oriented(self):
+        self.assertEqual(build_recommendation("low")["label"], "Likely safe to apply")
+        self.assertEqual(build_recommendation("medium")["label"], "Apply with caution")
+        self.assertEqual(build_recommendation("high")["label"], "Do not engage yet")
+
+    def test_evidence_payload_extracts_source_links(self):
+        payload = evidence_to_payload(
+            Evidence(
+                "Web search",
+                "found",
+                "Top results: Warning post (https://example.com/warning) | Review page (https://example.com/review)",
+                "example company recruitment scam",
+                "high",
+            )
+        )
+
+        self.assertEqual(payload["links"][0]["url"], "https://example.com/warning")
+        self.assertEqual(payload["links"][1]["url"], "https://example.com/review")
+
+    def test_usage_snapshot_reports_request_deltas(self):
+        from app import main
+
+        before = main.METRICS.copy()
+        main.METRICS["url_fetches"] += 2
+        main.METRICS["dns_lookups"] += 1
+        usage = build_usage_snapshot(before)
+
+        self.assertEqual(usage["url_fetches"], 2)
+        self.assertEqual(usage["dns_lookups"], 1)
+
+
+if __name__ == "__main__":
+    unittest.main()
