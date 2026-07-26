@@ -8,6 +8,7 @@ from uuid import uuid4
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.agents.orchestrator import run_agentic_analysis
 from app.analysis import (
     assert_job_url_accessible,
     build_agent_workflow,
@@ -90,6 +91,9 @@ async def analyze(
 
     try:
         pattern_score, findings = pattern_check(analysis_text)
+        llm_findings = await run_agentic_analysis(analysis_text)
+        findings = findings + llm_findings
+        pattern_score += sum(item["score"] for item in llm_findings)
         live_evidence = await verify_live(analysis_text, submitted_urls)
         assert_job_url_accessible(job_url, live_evidence)
         total_score = min(100, pattern_score + evidence_score(live_evidence))

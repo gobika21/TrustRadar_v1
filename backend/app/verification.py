@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
+from app.agents.skills.search_synthesis import judge_search_relevance
 from app.metrics import METRICS
 from app.models import Evidence
 from app.text_utils import domain_from_url, extract_emails, extract_urls, is_known_ats_domain, registered_domain
@@ -229,7 +230,12 @@ async def web_search(client: httpx.AsyncClient, query: str) -> Evidence:
             results.append(f"{title} ({href})")
         if results:
             detail = "Top results: " + " | ".join(results)
-            return Evidence("Web search", "found", detail, query, search_result_severity(query, detail))
+            severity = search_result_severity(query, detail)
+            llm_judgment = await judge_search_relevance(query, detail)
+            if llm_judgment:
+                severity = llm_judgment["severity"]
+                detail += f" | LLM assessment: {llm_judgment['reasoning']}"
+            return Evidence("Web search", "found", detail, query, severity)
         return Evidence("Web search", "not_found", "No search results were parsed for this query.", query, "medium")
     except httpx.HTTPError as exc:
         return Evidence("Web search", "failed", f"Search failed: {exc.__class__.__name__}", query, "medium")
