@@ -223,6 +223,13 @@ function formatAnalyzeError(error) {
       action: "Try another input",
     };
   }
+  if (message.includes("Too many requests")) {
+    return {
+      title: "Slow down a little",
+      message,
+      action: "Got it",
+    };
+  }
   return {
     title: "Analysis failed",
     message,

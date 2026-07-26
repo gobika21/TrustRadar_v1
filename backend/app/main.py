@@ -6,7 +6,7 @@ from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.agents.orchestrator import run_agentic_analysis
@@ -16,6 +16,8 @@ from app.analysis import (
     build_recommendation,
     evidence_to_payload,
 )
+from app.cache import get_cached_verification, store_cached_verification
+from app.rate_limit import enforce_rate_limit
 from app.metrics import METRICS, build_usage_snapshot, metrics_payload
 from app.models import Evidence
 from app.scoring import evidence_score, pattern_check, score_to_tier
@@ -76,12 +78,14 @@ async def delete_history() -> dict[str, str]:
 
 @app.post("/api/analyze")
 async def analyze(
+    request: Request,
     text: str = Form(""),
     job_url: str = Form(""),
     recruiter_url: str = Form(""),
     company_url: str = Form(""),
     files: list[UploadFile] = File(default=[]),
 ) -> dict[str, Any]:
+    enforce_rate_limit(request)
     started_at = perf_counter()
     METRICS["analyze_requests"] += 1
     usage_before = METRICS.copy()
@@ -92,10 +96,15 @@ async def analyze(
 
     try:
         pattern_score, findings = pattern_check(analysis_text)
-        llm_findings, live_evidence = await asyncio.gather(
-            run_agentic_analysis(analysis_text),
-            verify_live(analysis_text, submitted_urls),
-        )
+        cached = get_cached_verification(analysis_text, submitted_urls)
+        if cached is not None:
+            llm_findings, live_evidence = cached
+        else:
+            llm_findings, live_evidence = await asyncio.gather(
+                run_agentic_analysis(analysis_text),
+                verify_live(analysis_text, submitted_urls),
+            )
+            store_cached_verification(analysis_text, submitted_urls, (llm_findings, live_evidence))
         findings = findings + llm_findings
         pattern_score += sum(item["score"] for item in llm_findings)
         assert_job_url_accessible(job_url, live_evidence)
