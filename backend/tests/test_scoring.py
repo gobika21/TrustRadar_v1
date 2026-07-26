@@ -74,7 +74,7 @@ class TrustRadarScoringTests(unittest.TestCase):
         self.assertIn("urgency", ids)
         self.assertGreaterEqual(score, 50)
 
-    def test_gift_card_signing_bonus_is_not_flagged(self):
+    def test_gift_card_signing_bonus_is_not_critical_but_still_surfaced(self):
         score, findings = pattern_check(
             "We're excited to offer you the role! As a welcome gift, you'll receive a $100 gift "
             "card on your first day."
@@ -82,6 +82,8 @@ class TrustRadarScoringTests(unittest.TestCase):
         ids = {finding["id"] for finding in findings}
 
         self.assertNotIn("gift_card_payment", ids)
+        self.assertIn("gift_card_mentioned", ids)
+        self.assertLess(score, 24)
 
     def test_looks_like_job_content_rejects_unrelated_text(self):
         self.assertFalse(looks_like_job_content("Rate limit test message for verification purposes only, unique marker xyz123."))
@@ -94,6 +96,14 @@ class TrustRadarScoringTests(unittest.TestCase):
     def test_looks_like_job_content_accepts_email_or_url_even_without_keywords(self):
         self.assertTrue(looks_like_job_content("Reach me at scammer@example.com for more."))
         self.assertTrue(looks_like_job_content("See https://example.com/offer for details."))
+
+    def test_looks_like_job_content_rejects_generic_role_or_offer_mentions(self):
+        self.assertFalse(
+            looks_like_job_content(
+                "We're excited to offer you the role! As a welcome gift, you'll receive a "
+                "$100 gift card on your first day."
+            )
+        )
 
     def test_targeted_scam_search_result_is_high_severity(self):
         detail = (

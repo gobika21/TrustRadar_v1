@@ -24,6 +24,14 @@ SCAM_PATTERNS = [
         "explain": "Gift cards are untraceable and irreversible; legitimate employers never request payment this way.",
     },
     {
+        "id": "gift_card_mentioned",
+        "label": "Gift card mentioned",
+        "severity": "medium",
+        "score": 8,
+        "regex": r"\bgift\s*cards?\b",
+        "explain": "Gift cards are a frequent vector in employment scams even when framed as a reward; treat any gift-card mention with caution.",
+    },
+    {
         "id": "urgency",
         "label": "High-pressure urgency",
         "severity": "high",

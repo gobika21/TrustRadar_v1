@@ -13,12 +13,15 @@ KNOWN_ATS_DOMAINS = {
 }
 
 JOB_RELATED_KEYWORDS = {
-    "job", "jobs", "position", "role", "hire", "hiring", "recruit", "recruiter",
-    "recruitment", "salary", "interview", "apply", "applicant", "employer",
-    "employee", "career", "vacancy", "cv", "resume", "offer", "company", "remote",
-    "onboarding", "candidate", "part-time", "full-time", "internship", "staff",
-    "opportunity", "wage", "compensation", "benefits", "shift", "employment",
-    "hr", "workday", "linkedin", "whatsapp", "shortlisted", "shortlist",
+    "hiring", "recruit", "recruiter", "recruitment", "salary", "interview",
+    "applicant", "employer", "employee", "career", "vacancy", "cv", "resume",
+    "remote", "onboarding", "candidate", "part-time", "full-time", "internship",
+    "compensation", "benefits", "shift", "employment", "responsibilities",
+    "requirements", "qualifications", "experience", "skills", "duties",
+    "engineer", "developer", "designer", "manager", "analyst", "coordinator",
+    "specialist", "consultant", "assistant", "technician", "administrator",
+    "executive", "officer", "intern", "shortlisted", "shortlist", "workday",
+    "linkedin",
 }
 
 
