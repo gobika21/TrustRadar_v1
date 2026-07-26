@@ -1,5 +1,11 @@
 import React, { useEffect, useRef } from "react";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, Info, ShieldAlert, X } from "lucide-react";
+
+const TONE_ICONS = {
+  danger: ShieldAlert,
+  warning: AlertTriangle,
+  info: Info,
+};
 
 export function Toast({ error, message, onDismiss }) {
   const normalizedError = normalizeError(error || message);
@@ -43,10 +49,12 @@ export function Toast({ error, message, onDismiss }) {
 
   if (!isOpen) return null;
 
+  const ToneIcon = TONE_ICONS[normalizedError.tone] || AlertTriangle;
+
   return (
     <div className="error-modal-backdrop" role="presentation">
       <section
-        className="error-modal"
+        className={`error-modal ${normalizedError.tone}`}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="error-modal-title"
@@ -57,7 +65,7 @@ export function Toast({ error, message, onDismiss }) {
           <X size={16} />
         </button>
         <div className="error-modal-icon">
-          <AlertTriangle size={22} />
+          <ToneIcon size={26} />
         </div>
         <div>
           <h2 id="error-modal-title">{normalizedError.title}</h2>
@@ -72,17 +80,19 @@ export function Toast({ error, message, onDismiss }) {
 }
 
 function normalizeError(error) {
-  if (!error) return { title: "", message: "", action: "Close" };
+  if (!error) return { title: "", message: "", action: "Close", tone: "warning" };
   if (typeof error === "string") {
     return {
       title: "Unable to review this input",
       message: error,
       action: "Try again",
+      tone: "warning",
     };
   }
   return {
     title: error.title || "Unable to review this input",
     message: error.message || "",
     action: error.action || "Try again",
+    tone: error.tone || "warning",
   };
 }

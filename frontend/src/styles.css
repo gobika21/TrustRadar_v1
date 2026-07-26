@@ -257,6 +257,7 @@ a {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
+  overflow-x: hidden;
 }
 
 .eyebrow {
@@ -824,6 +825,10 @@ a {
   color: var(--muted-2);
 }
 
+.evidence > div {
+  min-width: 0;
+}
+
 .evidence-title {
   display: flex;
   align-items: center;
@@ -871,6 +876,7 @@ a {
   color: var(--muted);
   font-size: 0.8rem;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .evidence-links {
@@ -908,68 +914,107 @@ a {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: color-mix(in srgb, #000000 45%, transparent);
-  backdrop-filter: blur(4px);
+  background: color-mix(in srgb, #000000 50%, transparent);
+  backdrop-filter: blur(6px);
   z-index: 50;
+  animation: modal-backdrop-in 0.15s ease;
 }
 
 .error-modal {
+  --tone: var(--amber);
+  --tone-strong: var(--amber);
   position: relative;
-  width: min(420px, 100%);
-  padding: 28px 26px 24px;
+  width: min(440px, 100%);
+  padding: 32px 28px 26px;
   border-radius: var(--radius-lg);
   background: var(--panel-solid);
   border: 1px solid var(--line);
+  border-top: 3px solid var(--tone);
   box-shadow: var(--shadow-pop);
   text-align: center;
   display: grid;
   justify-items: center;
-  gap: 14px;
+  gap: 16px;
+  animation: modal-pop-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.error-modal.danger {
+  --tone: var(--red);
+  --tone-strong: var(--red-strong);
+}
+
+.error-modal.warning {
+  --tone: var(--amber);
+  --tone-strong: var(--amber);
+}
+
+.error-modal.info {
+  --tone: var(--brand-2);
+  --tone-strong: var(--brand-strong);
+}
+
+@keyframes modal-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-pop-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .error-modal-close {
   position: absolute;
-  top: 14px;
-  right: 14px;
+  top: 16px;
+  right: 16px;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  background: transparent;
+  background: var(--field);
   color: var(--muted);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.error-modal-close:hover {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--tone) 45%, var(--line));
 }
 
 .error-modal-icon {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  width: 60px;
+  height: 60px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--red) 14%, transparent);
-  color: var(--red);
+  background: color-mix(in srgb, var(--tone) 14%, var(--panel-solid));
+  border: 2px solid color-mix(in srgb, var(--tone) 45%, var(--line));
+  color: var(--tone-strong);
 }
 
 .error-modal h2 {
   margin: 0 0 6px;
-  font-size: 1.1rem;
+  font-family: "Lexend", "Inter", sans-serif;
+  font-size: 1.2rem;
   font-weight: 750;
+  letter-spacing: -0.01em;
 }
 
 .error-modal p {
   margin: 0;
   color: var(--muted);
-  font-size: 0.86rem;
-  line-height: 1.5;
+  font-size: 0.88rem;
+  line-height: 1.55;
 }
 
 .error-modal-action {
-  padding: 11px 22px;
+  padding: 12px 26px;
   border: none;
   border-radius: var(--radius-md);
   background: linear-gradient(120deg, #6d5ef4, #0e7490);
   color: #ffffff;
   font-weight: 700;
-  font-size: 0.86rem;
+  font-size: 0.88rem;
 }

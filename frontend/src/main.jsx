@@ -212,8 +212,9 @@ function formatAnalyzeError(error) {
   if (isNetworkError(error)) {
     return {
       title: "Connection issue",
-      message: "TrustRadar cannot reach the local API. Start the FastAPI backend on port 8001, then run the check again.",
+      message: "TrustRadar cannot reach the API right now. Check your connection, then run the check again.",
       action: "Close",
+      tone: "danger",
     };
   }
   if (message.includes("could not access the job posting URL") || message.includes("cannot be assessed reliably")) {
@@ -221,6 +222,7 @@ function formatAnalyzeError(error) {
       title: "Unable to review this link",
       message,
       action: "Try another input",
+      tone: "warning",
     };
   }
   if (message.includes("Too many requests")) {
@@ -228,6 +230,7 @@ function formatAnalyzeError(error) {
       title: "Slow down a little",
       message,
       action: "Got it",
+      tone: "warning",
     };
   }
   if (message.includes("doesn't look like a job post")) {
@@ -235,12 +238,14 @@ function formatAnalyzeError(error) {
       title: "Add the job description",
       message,
       action: "Try again",
+      tone: "info",
     };
   }
   return {
     title: "Analysis failed",
     message,
     action: "Try again",
+    tone: "danger",
   };
 }
 
