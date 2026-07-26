@@ -9,7 +9,7 @@ from uuid import uuid4
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.agents.orchestrator import run_agentic_analysis
+from app.agents.orchestrator import check_relevance, run_agentic_analysis
 from app.analysis import (
     assert_job_url_accessible,
     build_agent_workflow,
@@ -95,17 +95,21 @@ async def analyze(
     analysis_text = "\n\n".join(part for part in [text.strip(), uploaded_text] if part)
     METRICS["uploaded_files"] += len(uploaded_files)
 
-    if analysis_text.strip() and not submitted_urls and not looks_like_job_content(analysis_text):
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "This doesn't look like a job post or recruiter message. Paste the actual job "
-                "description, offer email, or recruiter message text, then run the check again."
-            ),
-        )
+    pattern_score, findings = pattern_check(analysis_text)
+
+    if analysis_text.strip() and not submitted_urls and not findings:
+        relevance = await check_relevance(analysis_text)
+        is_relevant = relevance["is_relevant"] if relevance is not None else looks_like_job_content(analysis_text)
+        if not is_relevant:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "This doesn't look like a job post or recruiter message. Paste the actual job "
+                    "description, offer email, or recruiter message text, then run the check again."
+                ),
+            )
 
     try:
-        pattern_score, findings = pattern_check(analysis_text)
         cached = get_cached_verification(analysis_text, submitted_urls)
         if cached is not None:
             llm_findings, live_evidence = cached

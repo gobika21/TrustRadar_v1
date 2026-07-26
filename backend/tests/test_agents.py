@@ -1,9 +1,10 @@
 import unittest
 from unittest.mock import patch
 
-from app.agents.dispatcher import dispatch_text_classification
+from app.agents.dispatcher import dispatch_relevance_check, dispatch_text_classification
 from app.agents.safety import redact_pii, wrap_untrusted
 from app.agents.skills.classifier import classify_scam_intent
+from app.agents.skills.relevance_classifier import classify_relevance
 from app.agents.skills.search_synthesis import judge_search_relevance
 from app.agents.skills.vision_ocr import extract_text_from_image
 
@@ -148,6 +149,62 @@ class DispatcherTests(unittest.IsolatedAsyncioTestCase):
         with patch("app.agents.dispatcher.agents_enabled", return_value=True):
             findings = await dispatch_text_classification("   ")
         self.assertEqual(findings, [])
+
+    async def test_dispatch_relevance_returns_none_when_agents_disabled(self):
+        with patch("app.agents.dispatcher.agents_enabled", return_value=False):
+            result = await dispatch_relevance_check("Some text.")
+        self.assertIsNone(result)
+
+    async def test_dispatch_relevance_returns_none_for_blank_text(self):
+        with patch("app.agents.dispatcher.agents_enabled", return_value=True):
+            result = await dispatch_relevance_check("   ")
+        self.assertIsNone(result)
+
+
+class RelevanceClassifierTests(unittest.IsolatedAsyncioTestCase):
+    async def test_returns_none_when_agents_disabled(self):
+        with patch("app.agents.skills.relevance_classifier.get_client", return_value=None):
+            result = await classify_relevance("We're excited to offer you the role!")
+        self.assertIsNone(result)
+
+    async def test_returns_none_for_blank_text(self):
+        with patch("app.agents.skills.relevance_classifier.get_client", return_value=FakeClient("{}")):
+            result = await classify_relevance("   ")
+        self.assertIsNone(result)
+
+    async def test_parses_relevant_verdict(self):
+        response_json = '{"is_relevant": true, "reason": "Mentions a job offer and a gift card."}'
+        with patch("app.agents.skills.relevance_classifier.get_client", return_value=FakeClient(response_json)):
+            result = await classify_relevance("We're excited to offer you the role! Here's a gift card.")
+        self.assertEqual(result["is_relevant"], True)
+
+    async def test_parses_irrelevant_verdict(self):
+        response_json = '{"is_relevant": false, "reason": "No connection to a job or employment."}'
+        with patch("app.agents.skills.relevance_classifier.get_client", return_value=FakeClient(response_json)):
+            result = await classify_relevance("Rate limit test message xyz123.")
+        self.assertEqual(result["is_relevant"], False)
+
+    async def test_malformed_json_returns_none(self):
+        with patch("app.agents.skills.relevance_classifier.get_client", return_value=FakeClient("not json")):
+            result = await classify_relevance("Some text.")
+        self.assertIsNone(result)
+
+    async def test_missing_is_relevant_key_returns_none(self):
+        with patch("app.agents.skills.relevance_classifier.get_client", return_value=FakeClient('{"reason": "n/a"}')):
+            result = await classify_relevance("Some text.")
+        self.assertIsNone(result)
+
+    async def test_client_exception_returns_none(self):
+        class RaisingMessages:
+            async def create(self, **kwargs):
+                raise RuntimeError("network error")
+
+        class RaisingClient:
+            messages = RaisingMessages()
+
+        with patch("app.agents.skills.relevance_classifier.get_client", return_value=RaisingClient()):
+            result = await classify_relevance("Some text.")
+        self.assertIsNone(result)
 
 
 if __name__ == "__main__":
