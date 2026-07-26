@@ -45,6 +45,22 @@ class TrustRadarScoringTests(unittest.TestCase):
         self.assertIn("generic_signature", ids)
         self.assertGreaterEqual(score, 40)
 
+    def test_negated_upfront_fee_is_not_flagged(self):
+        score, findings = pattern_check(
+            "We are pleased to offer you a position. Please note this role requires no upfront payment."
+        )
+        ids = {finding["id"] for finding in findings}
+
+        self.assertNotIn("upfront_fee", ids)
+
+    def test_unnegated_upfront_fee_is_still_flagged(self):
+        score, findings = pattern_check(
+            "To secure your position, please pay a $150 registration fee for training materials."
+        )
+        ids = {finding["id"] for finding in findings}
+
+        self.assertIn("upfront_fee", ids)
+
     def test_targeted_scam_search_result_is_high_severity(self):
         detail = (
             "Top results: Mumtaj Co. Job Scam Alert: Be Cautious of Fake Job Offers "

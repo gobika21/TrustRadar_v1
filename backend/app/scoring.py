@@ -101,11 +101,21 @@ def score_to_tier(score: int) -> tuple[str, str]:
     return "Lower risk", "low"
 
 
+NEGATION_WORDS = re.compile(r"\b(no|not|never|without|isn't|doesn't|won't|don't|didn't|wasn't|weren't|n't)\b", re.IGNORECASE)
+NEGATION_LOOKBACK_CHARS = 24
+
+
+def _is_negated(text: str, match_start: int) -> bool:
+    context = text[max(0, match_start - NEGATION_LOOKBACK_CHARS) : match_start]
+    return bool(NEGATION_WORDS.search(context))
+
+
 def pattern_check(text: str) -> tuple[int, list[dict[str, Any]]]:
     findings: list[dict[str, Any]] = []
     score = 0
     for pattern in SCAM_PATTERNS:
-        matches = re.findall(pattern["regex"], text, re.IGNORECASE | re.DOTALL)
+        all_matches = list(re.finditer(pattern["regex"], text, re.IGNORECASE | re.DOTALL))
+        matches = [match for match in all_matches if not _is_negated(text, match.start())]
         if matches:
             score += pattern["score"]
             findings.append(

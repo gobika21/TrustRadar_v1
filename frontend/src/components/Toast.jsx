@@ -1,13 +1,58 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { AlertTriangle, X } from "lucide-react";
 
 export function Toast({ error, message, onDismiss }) {
   const normalizedError = normalizeError(error || message);
-  if (!normalizedError.message) return null;
+  const modalRef = useRef(null);
+  const previouslyFocusedRef = useRef(null);
+  const isOpen = Boolean(normalizedError.message);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    previouslyFocusedRef.current = document.activeElement;
+    const modal = modalRef.current;
+    const focusable = modal.querySelectorAll("button, a[href], input, textarea, [tabindex]:not([tabindex='-1'])");
+    (focusable[0] || modal).focus();
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        onDismiss();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = modal.querySelectorAll("button, a[href], input, textarea, [tabindex]:not([tabindex='-1'])");
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocusedRef.current?.focus?.();
+    };
+  }, [isOpen, onDismiss]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="error-modal-backdrop" role="presentation">
-      <section className="error-modal" role="alertdialog" aria-modal="true" aria-labelledby="error-modal-title">
+      <section
+        className="error-modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="error-modal-title"
+        ref={modalRef}
+        tabIndex={-1}
+      >
         <button className="error-modal-close" type="button" onClick={onDismiss} aria-label="Close error">
           <X size={16} />
         </button>

@@ -350,6 +350,11 @@ a {
   background: color-mix(in srgb, var(--brand) 12%, var(--field));
 }
 
+.upload-box:focus-within {
+  border-color: color-mix(in srgb, var(--brand) 55%, var(--line));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 16%, transparent);
+}
+
 .upload-box input[type="file"] {
   position: absolute;
   width: 1px;
@@ -385,7 +390,7 @@ a {
   padding: 13px 18px;
   border: none;
   border-radius: var(--radius-md);
-  background: linear-gradient(120deg, var(--brand), var(--brand-2));
+  background: linear-gradient(120deg, #6d5ef4, #0e7490);
   color: #ffffff;
   font-size: 0.92rem;
   font-weight: 750;
@@ -683,31 +688,46 @@ a {
 .verdict-panel {
   --tone: var(--green);
   --tone-strong: var(--green-strong);
+  --tone-border-width: 1.5px;
+  --tone-border-mix: 42%;
+  --tone-bg-mix: 5%;
 }
 
 .verdict-panel.danger {
   --tone: var(--red);
   --tone-strong: var(--red-strong);
+  --tone-border-width: 2.5px;
+  --tone-border-mix: 60%;
+  --tone-bg-mix: 9%;
 }
 
 .verdict-panel.warning {
   --tone: var(--orange);
   --tone-strong: var(--orange);
+  --tone-border-width: 2px;
+  --tone-border-mix: 50%;
+  --tone-bg-mix: 7%;
 }
 
 .verdict-panel.review {
   --tone: var(--amber);
   --tone-strong: var(--amber);
+  --tone-border-width: 1.5px;
+  --tone-border-mix: 42%;
+  --tone-bg-mix: 5%;
 }
 
 .verdict-panel.clear {
   --tone: var(--green);
   --tone-strong: var(--green-strong);
+  --tone-border-width: 1.5px;
+  --tone-border-mix: 42%;
+  --tone-bg-mix: 5%;
 }
 
 .verdict-panel {
-  border: 2px solid color-mix(in srgb, var(--tone) 55%, var(--line));
-  background: color-mix(in srgb, var(--tone) 7%, var(--panel-solid));
+  border: var(--tone-border-width) solid color-mix(in srgb, var(--tone) var(--tone-border-mix), var(--line));
+  background: color-mix(in srgb, var(--tone) var(--tone-bg-mix), var(--panel-solid));
 }
 
 /* Verdict hero */
@@ -770,7 +790,7 @@ a {
 .score-gauge-readout span {
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--muted);
+  color: color-mix(in srgb, var(--muted) 65%, var(--ink));
 }
 
 /* Evidence list */
@@ -948,7 +968,7 @@ a {
   padding: 11px 22px;
   border: none;
   border-radius: var(--radius-md);
-  background: linear-gradient(120deg, var(--brand), var(--brand-2));
+  background: linear-gradient(120deg, #6d5ef4, #0e7490);
   color: #ffffff;
   font-weight: 700;
   font-size: 0.86rem;
