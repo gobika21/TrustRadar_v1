@@ -61,6 +61,28 @@ class TrustRadarScoringTests(unittest.TestCase):
 
         self.assertIn("upfront_fee", ids)
 
+    def test_refundable_deposit_via_gift_card_is_caught_without_llm(self):
+        score, findings = pattern_check(
+            "Congratulations! You have been selected for a Data Entry position. To finalize your "
+            "onboarding, kindly send a refundable deposit of $200 via gift card to secure your "
+            "laptop shipment. Reply within 2 hours or the offer expires."
+        )
+        ids = {finding["id"] for finding in findings}
+
+        self.assertIn("upfront_fee", ids)
+        self.assertIn("gift_card_payment", ids)
+        self.assertIn("urgency", ids)
+        self.assertGreaterEqual(score, 50)
+
+    def test_gift_card_signing_bonus_is_not_flagged(self):
+        score, findings = pattern_check(
+            "We're excited to offer you the role! As a welcome gift, you'll receive a $100 gift "
+            "card on your first day."
+        )
+        ids = {finding["id"] for finding in findings}
+
+        self.assertNotIn("gift_card_payment", ids)
+
     def test_looks_like_job_content_rejects_unrelated_text(self):
         self.assertFalse(looks_like_job_content("Rate limit test message for verification purposes only, unique marker xyz123."))
         self.assertFalse(looks_like_job_content("The weather today is sunny with a light breeze."))
