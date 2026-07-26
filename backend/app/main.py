@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from time import perf_counter
 from typing import Any
@@ -91,10 +92,12 @@ async def analyze(
 
     try:
         pattern_score, findings = pattern_check(analysis_text)
-        llm_findings = await run_agentic_analysis(analysis_text)
+        llm_findings, live_evidence = await asyncio.gather(
+            run_agentic_analysis(analysis_text),
+            verify_live(analysis_text, submitted_urls),
+        )
         findings = findings + llm_findings
         pattern_score += sum(item["score"] for item in llm_findings)
-        live_evidence = await verify_live(analysis_text, submitted_urls)
         assert_job_url_accessible(job_url, live_evidence)
         total_score = min(100, pattern_score + evidence_score(live_evidence))
         tier, tier_level = score_to_tier(total_score)
