@@ -174,7 +174,13 @@ function LiveVerification({ evidence }) {
 }
 
 function fallbackRecommendation(result) {
-  if (["critical", "high"].includes(result.tier_level)) {
+  if (result.tier_level === "critical") {
+    return {
+      label: "Don't apply to this",
+      detail: result.summary,
+    };
+  }
+  if (result.tier_level === "high") {
     return {
       label: "Do not engage yet",
       detail: result.summary,

@@ -49,7 +49,13 @@ def extract_evidence_links(item: Evidence) -> list[dict[str, str]]:
 
 
 def build_recommendation(tier_level: str) -> dict[str, str]:
-    if tier_level in {"critical", "high"}:
+    if tier_level == "critical":
+        return {
+            "label": "Don't apply to this",
+            "tone": "danger",
+            "detail": "This posting matches strong scam patterns. Do not pay, reply, or share personal or banking details.",
+        }
+    if tier_level == "high":
         return {
             "label": "Do not engage yet",
             "tone": "danger",

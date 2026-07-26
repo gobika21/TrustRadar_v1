@@ -250,6 +250,7 @@ class TrustRadarScoringTests(unittest.TestCase):
         self.assertEqual(build_recommendation("low")["label"], "Likely safe to apply")
         self.assertEqual(build_recommendation("medium")["label"], "Apply with caution")
         self.assertEqual(build_recommendation("high")["label"], "Do not engage yet")
+        self.assertEqual(build_recommendation("critical")["label"], "Don't apply to this")
 
     def test_evidence_payload_extracts_source_links(self):
         payload = evidence_to_payload(
