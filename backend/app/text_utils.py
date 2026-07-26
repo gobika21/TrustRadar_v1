@@ -12,6 +12,24 @@ KNOWN_ATS_DOMAINS = {
     "workdayjobs.com",
 }
 
+JOB_RELATED_KEYWORDS = {
+    "job", "jobs", "position", "role", "hire", "hiring", "recruit", "recruiter",
+    "recruitment", "salary", "interview", "apply", "applicant", "employer",
+    "employee", "career", "vacancy", "cv", "resume", "offer", "company", "remote",
+    "onboarding", "candidate", "part-time", "full-time", "internship", "staff",
+    "opportunity", "wage", "compensation", "benefits", "shift", "employment",
+    "hr", "workday", "linkedin", "whatsapp", "shortlisted", "shortlist",
+}
+
+
+def looks_like_job_content(text: str) -> bool:
+    lowered = text.lower()
+    if any(keyword in lowered for keyword in JOB_RELATED_KEYWORDS):
+        return True
+    if extract_emails(text) or extract_urls(text):
+        return True
+    return False
+
 
 def extract_urls(text: str) -> list[str]:
     urls = re.findall(r"https?://[^\s<>\]\)\"']+", text)

@@ -230,6 +230,13 @@ function formatAnalyzeError(error) {
       action: "Got it",
     };
   }
+  if (message.includes("doesn't look like a job post")) {
+    return {
+      title: "Add the job description",
+      message,
+      action: "Try again",
+    };
+  }
   return {
     title: "Analysis failed",
     message,

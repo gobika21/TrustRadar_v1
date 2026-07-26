@@ -6,7 +6,7 @@ from app.analysis import assert_job_url_accessible, build_recommendation, eviden
 from app.metrics import build_usage_snapshot
 from app.models import Evidence
 from app.scoring import evidence_score, pattern_check, score_to_tier
-from app.text_utils import domain_from_url, extract_urls
+from app.text_utils import domain_from_url, extract_urls, looks_like_job_content
 from app.uploads import decode_text_upload
 from app.verification import build_search_query, rdap_lookup, search_result_severity
 
@@ -60,6 +60,18 @@ class TrustRadarScoringTests(unittest.TestCase):
         ids = {finding["id"] for finding in findings}
 
         self.assertIn("upfront_fee", ids)
+
+    def test_looks_like_job_content_rejects_unrelated_text(self):
+        self.assertFalse(looks_like_job_content("Rate limit test message for verification purposes only, unique marker xyz123."))
+        self.assertFalse(looks_like_job_content("The weather today is sunny with a light breeze."))
+
+    def test_looks_like_job_content_accepts_job_keywords(self):
+        self.assertTrue(looks_like_job_content("We are hiring a Product Designer for a full-time role."))
+        self.assertTrue(looks_like_job_content(ALMUMTAJ_MESSAGE))
+
+    def test_looks_like_job_content_accepts_email_or_url_even_without_keywords(self):
+        self.assertTrue(looks_like_job_content("Reach me at scammer@example.com for more."))
+        self.assertTrue(looks_like_job_content("See https://example.com/offer for details."))
 
     def test_targeted_scam_search_result_is_high_severity(self):
         detail = (

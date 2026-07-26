@@ -22,7 +22,7 @@ from app.metrics import METRICS, build_usage_snapshot, metrics_payload
 from app.models import Evidence
 from app.scoring import evidence_score, pattern_check, score_to_tier
 from app.storage import clear_analyses, get_analysis, initialize_database, list_analyses, save_analysis
-from app.text_utils import domain_from_url, extract_emails, extract_urls
+from app.text_utils import domain_from_url, extract_emails, extract_urls, looks_like_job_content
 from app.uploads import read_uploads
 from app.verification import build_search_query, rdap_lookup, search_result_severity, verify_live
 
@@ -94,6 +94,15 @@ async def analyze(
     uploaded_text, uploaded_files = await read_uploads(files)
     analysis_text = "\n\n".join(part for part in [text.strip(), uploaded_text] if part)
     METRICS["uploaded_files"] += len(uploaded_files)
+
+    if analysis_text.strip() and not submitted_urls and not looks_like_job_content(analysis_text):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "This doesn't look like a job post or recruiter message. Paste the actual job "
+                "description, offer email, or recruiter message text, then run the check again."
+            ),
+        )
 
     try:
         pattern_score, findings = pattern_check(analysis_text)
