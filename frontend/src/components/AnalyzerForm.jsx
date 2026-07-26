@@ -4,6 +4,7 @@ import {
   Link2,
   Loader2,
   Radar,
+  RotateCcw,
   Upload,
 } from "lucide-react";
 
@@ -18,6 +19,8 @@ export function AnalyzerForm({
   loading,
   progress,
   onAnalyze,
+  showReset,
+  onReset,
 }) {
   return (
     <form className="input-panel" onSubmit={onAnalyze}>
@@ -25,6 +28,11 @@ export function AnalyzerForm({
         <div>
           <h2>Review a job before you apply</h2>
         </div>
+        {showReset ? (
+          <button className="reset-button" type="button" onClick={onReset}>
+            <RotateCcw size={14} /> New search
+          </button>
+        ) : null}
       </div>
 
       <label className="field large-field">

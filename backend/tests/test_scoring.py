@@ -45,6 +45,24 @@ class TrustRadarScoringTests(unittest.TestCase):
         self.assertIn("generic_signature", ids)
         self.assertGreaterEqual(score, 40)
 
+    def test_vague_interview_message_with_no_details_needs_verification(self):
+        score, findings = pattern_check("Hello, you are invited for an interview tomorrow")
+        ids = {finding["id"] for finding in findings}
+
+        self.assertIn("missing_role", ids)
+        self.assertIn("insufficient_verifiable_detail", ids)
+        tier, tier_level = score_to_tier(score)
+        self.assertEqual(tier_level, "medium")
+
+    def test_detailed_short_post_does_not_trigger_insufficient_detail(self):
+        score, findings = pattern_check(
+            "We are hiring a Product Designer at Lumen Studio, standard interview process, "
+            "salary $90k-$110k, apply via careers page."
+        )
+        ids = {finding["id"] for finding in findings}
+
+        self.assertNotIn("insufficient_verifiable_detail", ids)
+
     def test_negated_upfront_fee_is_not_flagged(self):
         score, findings = pattern_check(
             "We are pleased to offer you a position. Please note this role requires no upfront payment."

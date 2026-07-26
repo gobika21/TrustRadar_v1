@@ -117,6 +117,14 @@ function App() {
     setError(null);
   }
 
+  function startNewSearch() {
+    setText("");
+    setLinkUrl("");
+    setFiles([]);
+    setResult(null);
+    setError(null);
+  }
+
   async function clearHistory() {
     try {
       await fetch(HISTORY_URL, { method: "DELETE" });
@@ -144,6 +152,8 @@ function App() {
             loading={loading}
             progress={progress}
             onAnalyze={analyze}
+            showReset={Boolean(hasInput || result) && !loading}
+            onReset={startNewSearch}
           />
           <HistoryPanel history={searchHistory} onSelect={selectHistory} onClear={clearHistory} />
         </section>

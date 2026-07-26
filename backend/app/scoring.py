@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from app.models import Evidence
+from app.text_utils import extract_emails, extract_urls
 
 
 SCAM_PATTERNS = [
@@ -104,6 +105,13 @@ CONTEXTUAL_PATTERNS = [
         "score": 10,
         "explain": "Interview messages that omit the job title or requisition are harder to verify and often appear in mass outreach.",
     },
+    {
+        "id": "insufficient_verifiable_detail",
+        "label": "No verifiable details provided",
+        "severity": "medium",
+        "score": 15,
+        "explain": "This message gives no company name, role, contact link, or email -- there is nothing here to verify who is actually contacting you.",
+    },
 ]
 
 
@@ -188,7 +196,8 @@ def contextual_check(text: str) -> tuple[int, list[dict[str, Any]]]:
         "assistant",
         "coordinator",
     ]
-    if mentions_interview and not any(term in lowered for term in role_terms):
+    no_role_identified = mentions_interview and not any(term in lowered for term in role_terms)
+    if no_role_identified:
         pattern = CONTEXTUAL_PATTERNS[1]
         score += pattern["score"]
         findings.append(
@@ -201,6 +210,21 @@ def contextual_check(text: str) -> tuple[int, list[dict[str, Any]]]:
                 "matches": 1,
             }
         )
+
+        has_contact_signal = bool(extract_emails(text)) or bool(extract_urls(text))
+        if not has_contact_signal:
+            pattern = CONTEXTUAL_PATTERNS[2]
+            score += pattern["score"]
+            findings.append(
+                {
+                    "id": pattern["id"],
+                    "label": pattern["label"],
+                    "severity": pattern["severity"],
+                    "score": pattern["score"],
+                    "explanation": pattern["explain"],
+                    "matches": 1,
+                }
+            )
 
     return score, findings
 
