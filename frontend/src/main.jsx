@@ -86,9 +86,7 @@ function App() {
       }
       const analysisResult = await response.json();
       setResult(analysisResult);
-      const localEntry = buildLocalHistoryEntry({ text, linkUrl, files, result: analysisResult });
-      setSearchHistory((currentHistory) => persistHistory(mergeHistory([localEntry], currentHistory)));
-      loadHistory();
+      await loadHistory();
       clearInputs();
     } catch (err) {
       setError(formatAnalyzeError(err));
@@ -208,36 +206,6 @@ function historyFingerprint(entry) {
   ].join("|");
 }
 
-function buildLocalHistoryEntry({ text, linkUrl, files, result }) {
-  return {
-    id: `local-${Date.now()}`,
-    createdAt: new Date().toISOString(),
-    label: buildHistoryLabel({ text, linkUrl, files }),
-    input: {
-      text,
-      linkUrl,
-      files: files.map((file) => ({
-        name: file.name,
-        content_type: file.type,
-        note: "Stored locally for this browser history item.",
-      })),
-    },
-    result,
-  };
-}
-
-function buildHistoryLabel({ text, linkUrl, files }) {
-  if (linkUrl.trim()) {
-    try {
-      return new URL(linkUrl.trim().startsWith("http") ? linkUrl.trim() : `https://${linkUrl.trim()}`).hostname.replace(/^www\./, "");
-    } catch {
-      return linkUrl.trim().slice(0, 44);
-    }
-  }
-  if (text.trim()) return text.trim().slice(0, 44);
-  if (files.length) return `${files.length} uploaded file${files.length === 1 ? "" : "s"}`;
-  return "Untitled check";
-}
 
 function formatAnalyzeError(error) {
   const message = error?.message || "Analysis failed";

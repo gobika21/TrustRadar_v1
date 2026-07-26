@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import ipaddress
 import re
 import socket
 from html import unescape
@@ -30,9 +31,25 @@ async def resolve_dns(domain: str) -> Evidence:
     try:
         addresses = await asyncio.to_thread(socket.getaddrinfo, domain, None)
         ips = sorted({item[4][0] for item in addresses})[:4]
+        if any(is_non_public_ip(ip) for ip in ips):
+            return Evidence(
+                "DNS resolution",
+                "suspicious",
+                f"{domain} resolves to {', '.join(ips)}, which is a private/loopback address, not a public host.",
+                domain,
+                "high",
+            )
         return Evidence("DNS resolution", "found", f"{domain} resolves to {', '.join(ips)}", domain, "info")
     except socket.gaierror:
         return Evidence("DNS resolution", "not_found", f"{domain} does not resolve in DNS.", domain, "high")
+
+
+def is_non_public_ip(address: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return False
+    return ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_unspecified
 
 
 async def fetch_url(client: httpx.AsyncClient, url: str) -> Evidence:

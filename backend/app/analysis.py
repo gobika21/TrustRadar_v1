@@ -93,7 +93,11 @@ def build_agent_workflow(
         {
             "step": "Link and domain checks",
             "status": "complete" if {"URL reachability", "DNS resolution"} & live_labels else "skipped",
-            "detail": f"Checked reachability, DNS, and registration data for {domains_checked} domain{'s' if domains_checked != 1 else ''}.",
+            "detail": (
+                f"Checked reachability, DNS, and registration data for {domains_checked} domain{'s' if domains_checked != 1 else ''}."
+                if {"URL reachability", "DNS resolution"} & live_labels
+                else "Skipped link and domain checks because no URLs or domains were found in the submission."
+            ),
         },
         {
             "step": "Public web review",

@@ -36,23 +36,21 @@ export function AnalyzerForm({
         />
       </label>
 
-      <div className="evidence-row">
-        <label className="field">
-          <span><Link2 size={15} /> Job, recruiter, or company link</span>
-          <input value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} placeholder="Paste any relevant URL" />
-        </label>
+      <label className="field">
+        <span><Link2 size={15} /> Job or company link</span>
+        <input value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} placeholder="Paste any relevant URL" />
+      </label>
 
-        <label className="upload-box">
-          <Upload size={20} />
-          <span>{files.length ? `${files.length} file attached` : "Attach screenshots or files"}</span>
-          <input
-            type="file"
-            multiple
-            accept="image/*,.pdf,.txt"
-            onChange={(event) => setFiles(Array.from(event.target.files || []))}
-          />
-        </label>
-      </div>
+      <label className="upload-box">
+        <Upload size={18} />
+        <span>{files.length ? `${files.length} file attached` : "Attach screenshots or files"}</span>
+        <input
+          type="file"
+          multiple
+          accept="image/*,.pdf,.txt"
+          onChange={(event) => setFiles(Array.from(event.target.files || []))}
+        />
+      </label>
 
       <p className="privacy-note">
         <Info size={14} />

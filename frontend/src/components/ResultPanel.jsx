@@ -1,60 +1,95 @@
 import React from "react";
-import { Activity, AlertTriangle, CheckCircle2, ExternalLink, Globe, Loader2, Radar, ShieldCheck, Sparkles, Terminal } from "lucide-react";
+import { ExternalLink, Globe, Radar, ShieldCheck, Sparkles } from "lucide-react";
 import { severityLabel, tierClass } from "../utils/risk";
 
-const terminalSteps = [
-  { at: 8, command: "intake.read()", detail: "Reading submitted job evidence" },
-  { at: 24, command: "patterns.scan()", detail: "Checking scam language and recruiter signals" },
-  { at: 44, command: "links.verify()", detail: "Resolving URLs, DNS, and domain records" },
-  { at: 66, command: "web.review()", detail: "Searching public complaint and fake-job signals" },
-  { at: 84, command: "report.compose()", detail: "Preparing recommendation and evidence summary" },
+const loadingSteps = [
+  { at: 8, label: "Reading the job post" },
+  { at: 28, label: "Scanning for scam language" },
+  { at: 50, label: "Checking links and domains" },
+  { at: 72, label: "Searching for public warnings" },
+  { at: 88, label: "Building your recommendation" },
 ];
 
 export function ResultPanel({ result, loading, progress = 0 }) {
   if (loading) return <LoadingPanel progress={progress} />;
   if (!result) return <EmptyPanel />;
 
-  const redFlags = getRedFlags(result);
-  const trustReasons = getTrustReasons(result);
   const recommendation = result.recommendation || fallbackRecommendation(result);
 
   return (
-    <aside className="result-panel verdict-panel">
-      <section className={`verdict-hero ${tierClass(result.tier_level)}`}>
+    <aside className={`result-panel verdict-panel ${tierClass(result.tier_level)}`}>
+      <section className="verdict-hero">
         <div>
-          <p className="eyebrow">Recommendation</p>
           <h2>{recommendation.label}</h2>
           <p>{recommendation.detail}</p>
         </div>
-        <div className="score-orbit">
-          <strong>{result.score}</strong>
-          <span>/100</span>
-        </div>
+        <ScoreGauge score={result.score} />
       </section>
 
-      <section className="insight-grid">
-        <VerdictList
-          title={redFlags.length ? "Signals to investigate" : "No major warning signals"}
-          items={redFlags.length ? redFlags : ["The message does not match common scam-language patterns.", "Live checks did not return a strong public warning signal."]}
-          tone={redFlags.length ? "danger" : "safe"}
-        />
-        <VerdictList
-          title="Trust signals"
-          items={trustReasons}
-          tone="safe"
-        />
-      </section>
-
-      <AgentWorkflow steps={result.agent_workflow || []} usage={result.usage} />
-      <LiveVerification evidence={result.live_evidence} />
+      <LiveVerification evidence={buildEvidenceList(result)} />
     </aside>
+  );
+}
+
+const GAUGE_TICKS = 26;
+const GAUGE_STOPS = [
+  { t: 0, rgb: [22, 163, 74] },
+  { t: 0.25, rgb: [132, 204, 22] },
+  { t: 0.5, rgb: [234, 179, 8] },
+  { t: 0.75, rgb: [249, 115, 22] },
+  { t: 1, rgb: [239, 68, 68] },
+];
+
+function gaugeColor(t) {
+  for (let i = 0; i < GAUGE_STOPS.length - 1; i += 1) {
+    const start = GAUGE_STOPS[i];
+    const end = GAUGE_STOPS[i + 1];
+    if (t >= start.t && t <= end.t) {
+      const span = end.t - start.t || 1;
+      const localT = (t - start.t) / span;
+      const rgb = start.rgb.map((channel, index) => Math.round(channel + (end.rgb[index] - channel) * localT));
+      return `rgb(${rgb.join(",")})`;
+    }
+  }
+  return `rgb(${GAUGE_STOPS[GAUGE_STOPS.length - 1].rgb.join(",")})`;
+}
+
+function ScoreGauge({ score }) {
+  const activeT = Math.max(0, Math.min(100, score)) / 100;
+  return (
+    <div className="score-gauge">
+      <svg viewBox="0 0 120 68" aria-hidden="true">
+        {Array.from({ length: GAUGE_TICKS }).map((_, index) => {
+          const t = index / (GAUGE_TICKS - 1);
+          const angle = -90 + t * 180;
+          const isActive = t <= activeT;
+          return (
+            <line
+              key={index}
+              x1="60"
+              y1="8"
+              x2="60"
+              y2="21"
+              stroke={isActive ? gaugeColor(t) : "var(--line)"}
+              strokeWidth="4.4"
+              strokeLinecap="round"
+              transform={`rotate(${angle} 60 64)`}
+            />
+          );
+        })}
+      </svg>
+      <div className="score-gauge-readout">
+        <strong>{score}</strong>
+        <span>out of 100</span>
+      </div>
+    </div>
   );
 }
 
 function EmptyPanel() {
   return (
     <aside className="result-panel intro-panel">
-      <div className="intro-icon"><Radar size={34} /></div>
+      <div className="intro-icon"><Radar size={30} /></div>
       <h2>Know before you apply.</h2>
       <p>
         Paste a job post, recruiter message, or link. TrustRadar checks scam patterns,
@@ -70,99 +105,27 @@ function EmptyPanel() {
 }
 
 function LoadingPanel({ progress }) {
-  const activeIndex = terminalSteps.reduce((latestIndex, step, index) => (progress >= step.at ? index : latestIndex), -1);
-  const visibleSteps = terminalSteps.slice(0, Math.max(2, activeIndex + 2));
+  const activeStep = [...loadingSteps].reverse().find((step) => progress >= step.at) || loadingSteps[0];
 
   return (
     <aside className="result-panel loading-panel">
-      <section className="terminal-card">
-        <div className="terminal-topbar">
-          <span />
-          <span />
-          <span />
-          <strong><Terminal size={15} /> TrustRadar agent</strong>
-        </div>
-
-        <div className="terminal-body">
-          <p className="eyebrow">Review in progress</p>
-          <h2>Checking the posting</h2>
-          <p className="terminal-copy">The agent is reading the evidence, validating live signals, and building a recommendation.</p>
-
-          <div className="terminal-progress" aria-label={`Analysis ${progress}% complete`}>
-            <span style={{ width: `${progress}%` }} />
-            <strong>{progress}%</strong>
-          </div>
-
-          <div className="terminal-lines">
-            {visibleSteps.map((step, index) => {
-              const isDone = progress >= terminalSteps[index + 1]?.at;
-              const isActive = index === activeIndex || (!isDone && index === visibleSteps.length - 1);
-              return (
-                <div className={isActive ? "terminal-line active" : "terminal-line"} key={step.command}>
-                  <span className="terminal-prompt">$</span>
-                  <code>{step.command}</code>
-                  <small>{isDone ? "done" : isActive ? "running" : "queued"}</small>
-                  <p>{step.detail}</p>
-                </div>
-              );
-            })}
-            <div className="terminal-line cursor-line">
-              <span className="terminal-prompt">$</span>
-              <code>await result</code>
-              <Loader2 className="spin" size={13} />
-            </div>
-          </div>
-        </div>
-      </section>
+      <div className="loading-ring" aria-hidden="true">
+        <svg viewBox="0 0 100 100">
+          <circle className="ring-track" cx="50" cy="50" r="42" />
+          <circle
+            className="ring-progress"
+            cx="50"
+            cy="50"
+            r="42"
+            style={{ strokeDashoffset: 264 - (264 * progress) / 100 }}
+          />
+        </svg>
+        <strong>{progress}%</strong>
+      </div>
+      <p className="eyebrow">Review in progress</p>
+      <h2>Checking the posting</h2>
+      <p className="loading-step" aria-live="polite">{activeStep.label}&hellip;</p>
     </aside>
-  );
-}
-
-function VerdictList({ title, items, tone }) {
-  return (
-    <section className={`verdict-list ${tone}`}>
-      <h3>{tone === "danger" ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />} {title}</h3>
-      <ul>
-        {items.slice(0, 4).map((item) => <li key={item}>{item}</li>)}
-      </ul>
-    </section>
-  );
-}
-
-function AgentWorkflow({ steps, usage }) {
-  if (!steps.length && !usage) return null;
-  const usageItems = usage ? [
-    ["URL fetches", usage.url_fetches],
-    ["DNS checks", usage.dns_lookups],
-    ["Domain checks", usage.rdap_lookups],
-    ["Web searches", usage.web_searches],
-  ] : [];
-
-  return (
-    <section className="agent-workflow">
-      <div className="workflow-heading">
-        <h3><Activity size={16} /> Agent workflow</h3>
-        {usage ? <span>{usageItems.reduce((sum, [, value]) => sum + value, 0)} live calls</span> : null}
-      </div>
-      <div className="workflow-list">
-        {steps.slice(0, 5).map((item) => (
-          <article className="workflow-step" key={item.step}>
-            <CheckCircle2 size={15} />
-            <div>
-              <strong>{item.step}</strong>
-              <p>{item.detail}</p>
-            </div>
-          </article>
-        ))}
-      </div>
-      {usageItems.length ? (
-        <div className="usage-grid">
-          {usageItems.map(([label, value]) => (
-            <span key={label}><strong>{value}</strong>{label}</span>
-          ))}
-        </div>
-      ) : null}
-    </section>
   );
 }
 
@@ -229,27 +192,13 @@ function fallbackRecommendation(result) {
   };
 }
 
-function getRedFlags(result) {
-  const patternFlags = (result.pattern_findings || [])
-    .filter((item) => ["critical", "high", "medium"].includes(item.severity))
-    .map((item) => item.label);
-  const evidenceFlags = (result.live_evidence || [])
-    .filter((item) => ["critical", "high", "medium"].includes(item.severity))
-    .map((item) => `${item.label}: ${summarizeEvidence(item.detail)}`);
-  return [...patternFlags, ...evidenceFlags].slice(0, 4);
-}
-
-function getTrustReasons(result) {
-  const reasons = (result.live_evidence || [])
-    .filter((item) => item.severity === "info")
-    .map((item) => `${item.label}: ${summarizeEvidence(item.detail)}`);
-  if (!(result.pattern_findings || []).length) reasons.unshift("The message does not match common scam-language patterns.");
-  return reasons.length ? reasons.slice(0, 4) : ["The evidence was reviewed, but it does not provide enough positive signals to classify the posting as low risk."];
-}
-
-function summarizeEvidence(detail) {
-  return detail
-    .replace(/\s*\([^)]{45,}\)/g, "")
-    .replace(/\s*\|\s*/g, " · ")
-    .slice(0, 180);
+function buildEvidenceList(result) {
+  const patternEvidence = (result.pattern_findings || []).map((item) => ({
+    label: item.label,
+    severity: item.severity,
+    detail: item.explanation,
+    source: "pattern",
+    links: [],
+  }));
+  return [...patternEvidence, ...(result.live_evidence || [])];
 }
