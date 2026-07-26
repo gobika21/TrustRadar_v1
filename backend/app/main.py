@@ -35,6 +35,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://trustradar-v1-frontend.s3-website.eu-north-1.amazonaws.com",
+        "https://d1wofahxptye8m.cloudfront.net",
     ],
     allow_credentials=True,
     allow_methods=["*"],
