@@ -9,7 +9,7 @@ from uuid import uuid4
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.agents.orchestrator import check_relevance, run_agentic_analysis
+from app.agents.orchestrator import check_jd_validity, run_agentic_analysis
 from app.analysis import (
     assert_job_url_accessible,
     build_agent_workflow,
@@ -20,9 +20,9 @@ from app.cache import get_cached_verification, store_cached_verification
 from app.rate_limit import enforce_rate_limit
 from app.metrics import METRICS, build_usage_snapshot, metrics_payload
 from app.models import Evidence
-from app.scoring import evidence_score, pattern_check, score_to_tier
+from app.scoring import STRONG_SCAM_PATTERN_IDS, evidence_score, pattern_check, score_to_tier
 from app.storage import clear_analyses, get_analysis, initialize_database, list_analyses, save_analysis
-from app.text_utils import domain_from_url, extract_emails, extract_urls, looks_like_job_content
+from app.text_utils import domain_from_url, extract_emails, extract_urls, looks_like_valid_jd
 from app.uploads import read_uploads
 from app.verification import build_search_query, rdap_lookup, search_result_severity, verify_live
 
@@ -96,16 +96,18 @@ async def analyze(
     METRICS["uploaded_files"] += len(uploaded_files)
 
     pattern_score, findings = pattern_check(analysis_text)
+    has_strong_scam_signal = any(finding["id"] in STRONG_SCAM_PATTERN_IDS for finding in findings)
 
-    if analysis_text.strip() and not submitted_urls and not findings:
-        relevance = await check_relevance(analysis_text)
-        is_relevant = relevance["is_relevant"] if relevance is not None else looks_like_job_content(analysis_text)
-        if not is_relevant:
+    if analysis_text.strip() and not submitted_urls and not has_strong_scam_signal:
+        jd_check = await check_jd_validity(analysis_text)
+        is_valid_jd = jd_check["is_valid_jd"] if jd_check is not None else looks_like_valid_jd(analysis_text)
+        if not is_valid_jd:
             raise HTTPException(
                 status_code=422,
                 detail=(
-                    "This doesn't look like a job post or recruiter message. Paste the actual job "
-                    "description, offer email, or recruiter message text, then run the check again."
+                    "This doesn't include enough detail to review -- a job post or recruiter message "
+                    "should mention a company, role, or requirements. Paste the full job description or "
+                    "message text, then run the check again."
                 ),
             )
 

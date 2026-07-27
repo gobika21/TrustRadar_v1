@@ -4,7 +4,7 @@ import re
 from typing import Any
 
 from app.models import Evidence
-from app.text_utils import extract_emails, extract_urls
+from app.text_utils import ROLE_TITLE_TERMS, extract_emails, extract_urls
 
 
 SCAM_PATTERNS = [
@@ -114,6 +114,11 @@ CONTEXTUAL_PATTERNS = [
     },
 ]
 
+CONTEXTUAL_PATTERN_IDS = {pattern["id"] for pattern in CONTEXTUAL_PATTERNS}
+STRONG_SCAM_PATTERN_IDS = {
+    pattern["id"] for pattern in SCAM_PATTERNS if pattern["severity"] in {"critical", "high"}
+}
+
 
 def score_to_tier(score: int) -> tuple[str, str]:
     if score >= 70:
@@ -181,22 +186,7 @@ def contextual_check(text: str) -> tuple[int, list[dict[str, Any]]]:
         )
 
     mentions_interview = any(term in lowered for term in ["interview", "discussion", "shortlisted"])
-    role_terms = [
-        "position",
-        "role",
-        "job title",
-        "vacancy",
-        "requisition",
-        "developer",
-        "engineer",
-        "analyst",
-        "manager",
-        "designer",
-        "accountant",
-        "assistant",
-        "coordinator",
-    ]
-    no_role_identified = mentions_interview and not any(term in lowered for term in role_terms)
+    no_role_identified = mentions_interview and not any(term in lowered for term in ROLE_TITLE_TERMS)
     if no_role_identified:
         pattern = CONTEXTUAL_PATTERNS[1]
         score += pattern["score"]
@@ -243,6 +233,8 @@ def evidence_score(evidence: list[Evidence]) -> int:
                 score += 8
             elif item.label == "Domain registration":
                 score += 16
+            elif item.label == "Web search":
+                score += 24
             else:
                 score += 8
     return score

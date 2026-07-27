@@ -243,12 +243,12 @@ function formatAnalyzeError(error) {
       tone: "warning",
     };
   }
-  if (message.includes("doesn't look like a job post")) {
+  if (message.includes("doesn't include enough detail to review")) {
     return {
-      title: "Add the job description",
+      title: "Not enough detail to review",
       message,
       action: "Try again",
-      tone: "info",
+      tone: "warning",
     };
   }
   return {

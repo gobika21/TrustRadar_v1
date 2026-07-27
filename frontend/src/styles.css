@@ -294,17 +294,28 @@ a {
   letter-spacing: -0.01em;
 }
 
+.form-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.form-actions .analyze-button {
+  flex: 1;
+}
+
 .reset-button {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   flex: none;
-  padding: 7px 12px;
+  padding: 7px 16px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   background: var(--field);
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: 0.82rem;
   font-weight: 700;
   white-space: nowrap;
   transition: color 0.15s ease, border-color 0.15s ease;

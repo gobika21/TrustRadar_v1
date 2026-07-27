@@ -6,14 +6,19 @@ import re
 from app.agents.client import SEARCH_SYNTHESIS_MODEL, get_client
 from app.agents.safety import wrap_untrusted
 
-SYSTEM_PROMPT = """You judge whether web search results indicate that a SPECIFIC company or \
-domain has been reported as a scam, versus generic or unrelated content (listicles about job \
-scams in general, reviews of a different company, etc). Respond with ONLY a JSON object, no \
-prose, no markdown fences:
+SYSTEM_PROMPT = """You judge how much risk web search results signal about a company or domain \
+being checked for a job/recruitment scam. Respond with ONLY a JSON object, no prose, no \
+markdown fences:
 {"severity": "high|medium|info", "reasoning": "One sentence."}
-Use "high" only if a result specifically names or clearly refers to the target company or \
-domain in a scam-warning context. Use "medium" for plausible but vague relevance. Use "info" \
-if the results are generic or unrelated to the specific target."""
+Use "high" if a result specifically names or clearly refers to the target company or domain in \
+a scam-warning, fraud, or complaint context.
+Use "medium" if the results discuss job/recruitment scams, fraud, or fake-job warnings in \
+general -- even if they do not name the target company specifically. Generic scam-awareness \
+articles (FTC, BBB, "how to spot a fake job offer", etc.) count as "medium", not "info", \
+because their presence in top results means no positive evidence of the company's legitimacy \
+was found either -- do not treat generic scam content as a safe/neutral signal.
+Use "info" only if the results are unrelated to job/recruitment scams altogether -- for \
+example the company's own official site, unrelated news, or completely off-topic pages."""
 
 
 async def judge_search_relevance(query: str, result_text: str) -> dict[str, str] | None:

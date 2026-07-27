@@ -204,11 +204,9 @@ def search_result_severity(query: str, result_text: str) -> str:
     ]
     if target_negative_entries:
         return "high"
-    if any(term in lowered for term in ["job scam alert", "job scam", "fake recruiting", "fake job offers", "personal data theft"]) and any(
-        token in lowered for token in target_tokens
-    ):
-        return "medium"
     if target_reputation_entries:
+        return "medium"
+    if any(term in lowered for term in negative_terms):
         return "medium"
     return "info"
 

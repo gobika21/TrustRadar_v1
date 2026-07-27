@@ -1,10 +1,10 @@
 import unittest
 from unittest.mock import patch
 
-from app.agents.dispatcher import dispatch_relevance_check, dispatch_text_classification
+from app.agents.dispatcher import dispatch_jd_check, dispatch_text_classification
 from app.agents.safety import redact_pii, wrap_untrusted
 from app.agents.skills.classifier import classify_scam_intent
-from app.agents.skills.relevance_classifier import classify_relevance
+from app.agents.skills.jd_analyzer import analyze_jd
 from app.agents.skills.search_synthesis import judge_search_relevance
 from app.agents.skills.vision_ocr import extract_text_from_image
 
@@ -150,48 +150,52 @@ class DispatcherTests(unittest.IsolatedAsyncioTestCase):
             findings = await dispatch_text_classification("   ")
         self.assertEqual(findings, [])
 
-    async def test_dispatch_relevance_returns_none_when_agents_disabled(self):
+    async def test_dispatch_jd_check_returns_none_when_agents_disabled(self):
         with patch("app.agents.dispatcher.agents_enabled", return_value=False):
-            result = await dispatch_relevance_check("Some text.")
+            result = await dispatch_jd_check("Some text.")
         self.assertIsNone(result)
 
-    async def test_dispatch_relevance_returns_none_for_blank_text(self):
+    async def test_dispatch_jd_check_returns_none_for_blank_text(self):
         with patch("app.agents.dispatcher.agents_enabled", return_value=True):
-            result = await dispatch_relevance_check("   ")
+            result = await dispatch_jd_check("   ")
         self.assertIsNone(result)
 
 
-class RelevanceClassifierTests(unittest.IsolatedAsyncioTestCase):
+class JdAnalyzerTests(unittest.IsolatedAsyncioTestCase):
     async def test_returns_none_when_agents_disabled(self):
-        with patch("app.agents.skills.relevance_classifier.get_client", return_value=None):
-            result = await classify_relevance("We're excited to offer you the role!")
+        with patch("app.agents.skills.jd_analyzer.get_client", return_value=None):
+            result = await analyze_jd("We're excited to offer you the role!")
         self.assertIsNone(result)
 
     async def test_returns_none_for_blank_text(self):
-        with patch("app.agents.skills.relevance_classifier.get_client", return_value=FakeClient("{}")):
-            result = await classify_relevance("   ")
+        with patch("app.agents.skills.jd_analyzer.get_client", return_value=FakeClient("{}")):
+            result = await analyze_jd("   ")
         self.assertIsNone(result)
 
-    async def test_parses_relevant_verdict(self):
-        response_json = '{"is_relevant": true, "reason": "Mentions a job offer and a gift card."}'
-        with patch("app.agents.skills.relevance_classifier.get_client", return_value=FakeClient(response_json)):
-            result = await classify_relevance("We're excited to offer you the role! Here's a gift card.")
-        self.assertEqual(result["is_relevant"], True)
+    async def test_parses_valid_verdict(self):
+        response_json = '{"is_valid_jd": true, "missing": [], "reason": "Names a company and role."}'
+        with patch("app.agents.skills.jd_analyzer.get_client", return_value=FakeClient(response_json)):
+            result = await analyze_jd("We are hiring a Product Designer at Lumen Studio.")
+        self.assertEqual(result["is_valid_jd"], True)
 
-    async def test_parses_irrelevant_verdict(self):
-        response_json = '{"is_relevant": false, "reason": "No connection to a job or employment."}'
-        with patch("app.agents.skills.relevance_classifier.get_client", return_value=FakeClient(response_json)):
-            result = await classify_relevance("Rate limit test message xyz123.")
-        self.assertEqual(result["is_relevant"], False)
+    async def test_parses_invalid_verdict(self):
+        response_json = (
+            '{"is_valid_jd": false, "missing": ["company", "role", "requirements"], '
+            '"reason": "No concrete details given."}'
+        )
+        with patch("app.agents.skills.jd_analyzer.get_client", return_value=FakeClient(response_json)):
+            result = await analyze_jd("Hello, you are invited for an interview tomorrow.")
+        self.assertEqual(result["is_valid_jd"], False)
+        self.assertIn("company", result["missing"])
 
     async def test_malformed_json_returns_none(self):
-        with patch("app.agents.skills.relevance_classifier.get_client", return_value=FakeClient("not json")):
-            result = await classify_relevance("Some text.")
+        with patch("app.agents.skills.jd_analyzer.get_client", return_value=FakeClient("not json")):
+            result = await analyze_jd("Some text.")
         self.assertIsNone(result)
 
-    async def test_missing_is_relevant_key_returns_none(self):
-        with patch("app.agents.skills.relevance_classifier.get_client", return_value=FakeClient('{"reason": "n/a"}')):
-            result = await classify_relevance("Some text.")
+    async def test_missing_is_valid_jd_key_returns_none(self):
+        with patch("app.agents.skills.jd_analyzer.get_client", return_value=FakeClient('{"reason": "n/a"}')):
+            result = await analyze_jd("Some text.")
         self.assertIsNone(result)
 
     async def test_client_exception_returns_none(self):
@@ -202,8 +206,8 @@ class RelevanceClassifierTests(unittest.IsolatedAsyncioTestCase):
         class RaisingClient:
             messages = RaisingMessages()
 
-        with patch("app.agents.skills.relevance_classifier.get_client", return_value=RaisingClient()):
-            result = await classify_relevance("Some text.")
+        with patch("app.agents.skills.jd_analyzer.get_client", return_value=RaisingClient()):
+            result = await analyze_jd("Some text.")
         self.assertIsNone(result)
 
 

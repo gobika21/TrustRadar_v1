@@ -6,7 +6,7 @@ from app.analysis import assert_job_url_accessible, build_recommendation, eviden
 from app.metrics import build_usage_snapshot
 from app.models import Evidence
 from app.scoring import evidence_score, pattern_check, score_to_tier
-from app.text_utils import domain_from_url, extract_urls, looks_like_job_content
+from app.text_utils import domain_from_url, extract_urls, looks_like_job_content, looks_like_valid_jd
 from app.uploads import decode_text_upload
 from app.verification import build_search_query, rdap_lookup, search_result_severity
 
@@ -122,6 +122,29 @@ class TrustRadarScoringTests(unittest.TestCase):
                 "$100 gift card on your first day."
             )
         )
+
+    def test_looks_like_valid_jd_rejects_vague_interview_notice(self):
+        self.assertFalse(looks_like_valid_jd("Hello, you are invited for an interview tomorrow"))
+
+    def test_looks_like_valid_jd_rejects_generic_role_offer_with_gift_card(self):
+        self.assertFalse(
+            looks_like_valid_jd(
+                "We're excited to offer you the role! As a welcome gift, you'll receive a "
+                "$100 gift card on your first day."
+            )
+        )
+
+    def test_looks_like_valid_jd_accepts_role_and_salary_detail(self):
+        self.assertTrue(
+            looks_like_valid_jd(
+                "We are hiring a Product Designer at Lumen Studio. Standard interview process, "
+                "salary $90k-$110k, apply via the careers page."
+            )
+        )
+
+    def test_looks_like_valid_jd_accepts_email_or_url(self):
+        self.assertTrue(looks_like_valid_jd("Reach me at scammer@example.com for more."))
+        self.assertTrue(looks_like_valid_jd("See https://example.com/offer for details."))
 
     def test_targeted_scam_search_result_is_high_severity(self):
         detail = (
@@ -240,7 +263,7 @@ class TrustRadarScoringTests(unittest.TestCase):
         self.assertEqual(tier_level, "low")
         self.assertEqual(tier, "Lower risk")
 
-    def test_generic_search_warning_does_not_attach_to_company(self):
+    def test_generic_search_warning_still_flags_as_medium(self):
         detail = (
             "Top results: info.riministreet.com Reviews | scam, legit or safe check | Scamadviser "
             "(https://www.scamadviser.com/check-website/info.riministreet.com) | "
@@ -248,7 +271,30 @@ class TrustRadarScoringTests(unittest.TestCase):
             "(https://consumer.ftc.gov/example)"
         )
 
+        self.assertEqual(search_result_severity("riministreet.com company recruitment scam", detail), "medium")
+
+    def test_search_results_with_no_scam_language_are_info(self):
+        detail = "Top results: Rimini Street | Official careers page (https://www.riministreet.com/careers)"
+
         self.assertEqual(search_result_severity("riministreet.com company recruitment scam", detail), "info")
+
+    def test_generic_scam_warning_search_result_leaves_lower_risk_tier(self):
+        tier, tier_level = score_to_tier(
+            evidence_score(
+                [
+                    Evidence(
+                        "Web search",
+                        "found",
+                        "Top results: Scammers impersonate well-known companies, recruit for fake jobs on LinkedIn",
+                        "lumen studio company recruitment scam",
+                        "medium",
+                    ),
+                ]
+            )
+        )
+
+        self.assertNotEqual(tier, "Lower risk")
+        self.assertIn(tier_level, {"medium", "high", "critical"})
 
     def test_failed_live_checks_do_not_create_scam_score(self):
         tier, tier_level = score_to_tier(

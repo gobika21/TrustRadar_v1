@@ -24,10 +24,44 @@ JOB_RELATED_KEYWORDS = {
     "linkedin",
 }
 
+ROLE_TITLE_TERMS = {
+    "engineer", "developer", "designer", "manager", "analyst", "coordinator",
+    "specialist", "consultant", "assistant", "technician", "administrator",
+    "executive", "officer", "intern", "accountant", "architect", "director",
+    "recruiter",
+}
+
+REQUIREMENT_TERMS = {
+    "requirements", "qualifications", "experience", "skills", "responsibilities",
+    "duties", "salary", "compensation", "benefits", "stipend",
+}
+
+SALARY_PATTERN = re.compile(r"\$\s?\d{2,3}\s?[kK]\b|\bper\s+(annum|year|month|hour)\b", re.IGNORECASE)
+COMPANY_LABEL_PATTERN = re.compile(r"\b(company|employer)\s*:\s*\S", re.IGNORECASE)
+
 
 def looks_like_job_content(text: str) -> bool:
     lowered = text.lower()
     if any(keyword in lowered for keyword in JOB_RELATED_KEYWORDS):
+        return True
+    if extract_emails(text) or extract_urls(text):
+        return True
+    return False
+
+
+def looks_like_valid_jd(text: str) -> bool:
+    """Strict heuristic: does this text contain a concrete, verifiable JD detail?
+
+    Used as the no-LLM fallback for the JD-analyzer gate. Requires evidence of a
+    role/title, requirements/skills, a salary figure, or a company label -- a
+    bare mention of "interview" or "offer" alone is not enough.
+    """
+    lowered = text.lower()
+    if any(term in lowered for term in ROLE_TITLE_TERMS):
+        return True
+    if any(term in lowered for term in REQUIREMENT_TERMS):
+        return True
+    if SALARY_PATTERN.search(text) or COMPANY_LABEL_PATTERN.search(text):
         return True
     if extract_emails(text) or extract_urls(text):
         return True

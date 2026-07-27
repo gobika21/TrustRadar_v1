@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.agents.dispatcher import dispatch_relevance_check, dispatch_text_classification
+from app.agents.dispatcher import dispatch_jd_check, dispatch_text_classification
 
 
 async def run_agentic_analysis(text: str) -> list[dict[str, Any]]:
@@ -15,10 +15,10 @@ async def run_agentic_analysis(text: str) -> list[dict[str, Any]]:
     return await dispatch_text_classification(text)
 
 
-async def check_relevance(text: str) -> dict[str, Any] | None:
-    """Ask the relevance-classifier skill whether text is worth analyzing.
+async def check_jd_validity(text: str) -> dict[str, Any] | None:
+    """Ask the JD-analyzer skill whether text has enough concrete detail to review.
 
     Returns None when agents are disabled or the check fails, signalling
     callers to fall back to the regex/keyword heuristic instead.
     """
-    return await dispatch_relevance_check(text)
+    return await dispatch_jd_check(text)

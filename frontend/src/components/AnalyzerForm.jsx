@@ -28,11 +28,6 @@ export function AnalyzerForm({
         <div>
           <h2>Review a job before you apply</h2>
         </div>
-        {showReset ? (
-          <button className="reset-button" type="button" onClick={onReset}>
-            <RotateCcw size={14} /> New search
-          </button>
-        ) : null}
       </div>
 
       <label className="field large-field">
@@ -65,20 +60,27 @@ export function AnalyzerForm({
         Avoid uploading passports, IDs, bank details, OTPs, or private offer documents.
       </p>
 
-      <button className={`analyze-button${loading ? " is-loading" : ""}`} type="submit" disabled={!hasInput || loading}>
-        {loading ? (
-          <>
-            <Loader2 className="spin" size={18} />
-            <span>Analyzing</span>
-            <strong>{progress}%</strong>
-          </>
-        ) : (
-          <>
-            <Radar size={17} />
-            <span>Analyze job</span>
-          </>
-        )}
-      </button>
+      <div className="form-actions">
+        <button className={`analyze-button${loading ? " is-loading" : ""}`} type="submit" disabled={!hasInput || loading}>
+          {loading ? (
+            <>
+              <Loader2 className="spin" size={18} />
+              <span>Analyzing</span>
+              <strong>{progress}%</strong>
+            </>
+          ) : (
+            <>
+              <Radar size={17} />
+              <span>Analyze job</span>
+            </>
+          )}
+        </button>
+        {showReset ? (
+          <button className="reset-button" type="button" onClick={onReset}>
+            <RotateCcw size={14} /> New search
+          </button>
+        ) : null}
+      </div>
     </form>
   );
 }
