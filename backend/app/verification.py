@@ -260,6 +260,15 @@ def build_search_query(text: str, urls: list[str], emails: list[str]) -> str:
         company_name = normalize_company_name(about_match.group(1))
         if company_name:
             return f"{company_name} recruitment scam"
+    lowercase_company_match = re.search(
+        r"\b(?:from|at|with)\s+([a-zA-Z][a-zA-Z0-9 &.'-]{1,60}?)\s+company\b",
+        text,
+        re.IGNORECASE,
+    )
+    if lowercase_company_match:
+        company_name = normalize_company_name(lowercase_company_match.group(1))
+        if company_name:
+            return f"{company_name} recruitment scam"
     words = re.findall(r"\b[A-Z][A-Za-z0-9&.-]{2,}\b", text)
     return " ".join(words[:4] + ["recruitment", "scam"]) if words else ""
 

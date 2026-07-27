@@ -10,25 +10,23 @@ from app.agents.safety import redact_pii
 SYSTEM_PROMPT = """You judge whether a piece of text contains enough real job-description \
 substance to be worth analyzing for scam risk, or whether it is too vague/generic to review. \
 Respond with ONLY a JSON object, no prose, no markdown fences:
-{"is_valid_jd": true|false, "missing": ["company", "role", "requirements"], "reason": "One short sentence."}
+{"is_valid_jd": true|false, "missing": ["role", "requirements"], "reason": "One short sentence."}
 
-A message is a valid JD (is_valid_jd: true) only if it includes at least one concrete, \
-verifiable detail such as:
-- a company or employer name
-- a job title or role
-- skills, responsibilities, or requirements
-- a specific salary, location, or application process
+A message is a valid JD (is_valid_jd: true) only if it names an actual job title/role, OR \
+describes concrete skills, responsibilities, or requirements for the work involved.
 
-A message is NOT a valid JD (is_valid_jd: false) if it is a vague notification, greeting, or \
-generic statement with none of the above -- for example "you're invited for an interview \
-tomorrow" or "we'd like to offer you the role" with no company name, job title, or any other \
-identifying detail. Mentioning words like "interview", "offer", "job", or "position" alone, \
-with nothing else concrete attached, is NOT enough to pass.
+A message is NOT a valid JD (is_valid_jd: false) if it lacks both of those -- even if it \
+names a company, states a salary figure, gives a join date, or uses words like "offer", \
+"hired", or "selected". A company name plus a salary number is NOT enough on its own: a \
+message like "You got the offer from Acme Company, salary $500, join next month" must be \
+marked false, because it never says what the job actually is. Likewise "you're invited for \
+an interview tomorrow" or "we'd like to offer you the role" with no job title or duties \
+mentioned is false.
 
-The "missing" field should list which of company/role/requirements are absent, for messages \
-that fail. Set is_valid_jd to true whenever at least one concrete detail above is present, \
-even if the message also contains suspicious or scam-like content -- that risk gets assessed \
-separately once the message passes this check."""
+The "missing" field should list which of role/requirements are absent, for messages that \
+fail. Set is_valid_jd to true whenever a real job title or concrete duties/requirements are \
+present, even if the message also contains suspicious or scam-like content -- that risk gets \
+assessed separately once the message passes this check."""
 
 
 async def analyze_jd(text: str) -> dict[str, Any] | None:

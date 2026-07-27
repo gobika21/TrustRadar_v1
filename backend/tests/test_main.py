@@ -52,7 +52,10 @@ class AnalyzeEndpointTests(unittest.TestCase):
         response = self.client.post(
             "/api/analyze",
             data={
-                "text": "Congrats, you got the job! Send a $100 gift card today to confirm your start date."
+                "text": (
+                    "We're excited to offer you the role! As a welcome gift, you'll receive a "
+                    "$100 gift card on your first day."
+                )
             },
         )
         self.assertEqual(response.status_code, 422)
@@ -66,6 +69,38 @@ class AnalyzeEndpointTests(unittest.TestCase):
         body = response.json()
         self.assertGreaterEqual(body["score"], 45)
         self.assertIn(body["tier_level"], {"high", "critical"})
+
+    def test_instant_offer_with_no_process_bypasses_the_jd_gate_and_is_scored(self):
+        response = self.client.post(
+            "/api/analyze",
+            data={
+                "text": (
+                    "Congrats, you got the job! Send a $100 gift card today to confirm your "
+                    "start date."
+                )
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        ids = {finding["id"] for finding in body["pattern_findings"]}
+        self.assertIn("instant_offer_no_process", ids)
+        self.assertNotEqual(body["tier"], "Lower risk")
+
+    def test_vague_offer_with_company_and_salary_but_no_role_is_blocked(self):
+        response = self.client.post(
+            "/api/analyze",
+            data={
+                "text": (
+                    "welcome, you got offer from trust radar company with salary of 2000 AED, "
+                    "please join on Aug,2026"
+                )
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        ids = {finding["id"] for finding in body["pattern_findings"]}
+        self.assertIn("instant_offer_no_process", ids)
+        self.assertNotEqual(body["tier"], "Lower risk")
 
     def test_url_only_submission_bypasses_the_jd_gate(self):
         response = self.client.post("/api/analyze", data={"job_url": "https://example.com/careers/12345"})

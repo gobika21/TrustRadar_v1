@@ -112,12 +112,30 @@ CONTEXTUAL_PATTERNS = [
         "score": 15,
         "explain": "This message gives no company name, role, contact link, or email -- there is nothing here to verify who is actually contacting you.",
     },
+    {
+        "id": "instant_offer_no_process",
+        "label": "Instant offer with no hiring process",
+        "severity": "high",
+        "score": 25,
+        "explain": "This message announces a job offer or selection without any interview, application, or hiring process mentioned -- legitimate employers essentially always have some verifiable process before extending an offer.",
+    },
 ]
+
+INSTANT_OFFER_PATTERN = re.compile(
+    r"\byou\s+(got|have\s+got|have)\s+(the\s+)?(job|offer|position)\b"
+    r"|\byou'?ve?\s+been\s+(hired|selected)\b"
+    r"|\bcongratulations,?\s+you\s+(got|have)\s+(the\s+)?(job|offer)\b",
+    re.IGNORECASE,
+)
+PROCESS_TERMS = {
+    "interview", "apply", "application", "resume", "cv", "process",
+    "assessment", "test", "screening",
+}
 
 CONTEXTUAL_PATTERN_IDS = {pattern["id"] for pattern in CONTEXTUAL_PATTERNS}
 STRONG_SCAM_PATTERN_IDS = {
     pattern["id"] for pattern in SCAM_PATTERNS if pattern["severity"] in {"critical", "high"}
-}
+} | {"instant_offer_no_process"}
 
 
 def score_to_tier(score: int) -> tuple[str, str]:
@@ -215,6 +233,22 @@ def contextual_check(text: str) -> tuple[int, list[dict[str, Any]]]:
                     "matches": 1,
                 }
             )
+
+    mentions_instant_offer = bool(INSTANT_OFFER_PATTERN.search(text))
+    mentions_process = any(term in lowered for term in PROCESS_TERMS)
+    if mentions_instant_offer and not mentions_process:
+        pattern = CONTEXTUAL_PATTERNS[3]
+        score += pattern["score"]
+        findings.append(
+            {
+                "id": pattern["id"],
+                "label": pattern["label"],
+                "severity": pattern["severity"],
+                "score": pattern["score"],
+                "explanation": pattern["explain"],
+                "matches": 1,
+            }
+        )
 
     return score, findings
 
